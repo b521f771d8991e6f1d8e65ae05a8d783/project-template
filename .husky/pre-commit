@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔨 Running nix build before commit..."
+
+if ! nix build; then
+  echo ""
+  echo "❌ nix build failed — commit blocked"
+  echo ""
+  echo "Fix the build errors and try again:"
+  echo "  nix build .#web-app       # if you touched wasm/emscripten/TypeScript web code"
+  echo "  nix build .#electron-app  # if you touched the Electron shell or web-app output"
+  echo "  nix build .#native        # if you touched native cmake/cargo/server code"
+  exit 1
+fi
+
+echo "✅ nix build passed — commit allowed"

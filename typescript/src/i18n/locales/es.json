@@ -1,0 +1,12 @@
+{
+	"common": {
+		"ok": "Aceptar",
+		"cancel": "Cancelar",
+		"save": "Guardar",
+		"delete": "Eliminar",
+		"loading": "Cargando..."
+	},
+	"home": {
+		"welcome": "Bienvenido"
+	}
+}

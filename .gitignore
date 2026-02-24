@@ -1,0 +1,27 @@
+node_modules
+
+# Swift parts
+/.build
+
+# Rust parts
+/target
+/target/pkg
+
+# For the native parts
+/.cmake
+/out
+/.cmake-emscripten
+/dependencies/vcpkg/buildtrees
+/dependencies/vcpkg/downloads
+/dependencies/vcpkg/packages
+/dependencies/vcpkg/vcpkg
+
+# By our build process
+/output
+
+# important for nix
+/result
+
+/index.d.ts
+/index.node
+/.claude

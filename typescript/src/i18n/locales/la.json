@@ -1,0 +1,12 @@
+{
+	"common": {
+		"ok": "Ita",
+		"cancel": "Relinque",
+		"save": "Serva",
+		"delete": "Dele",
+		"loading": "Onerans..."
+	},
+	"home": {
+		"welcome": "Salve"
+	}
+}

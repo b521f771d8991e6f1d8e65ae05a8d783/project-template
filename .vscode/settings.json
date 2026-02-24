@@ -1,0 +1,13 @@
+{
+	"editor.tabSize":  2,
+  	"editor.formatOnSave": true,
+        "files.autoSave": "onFocusChange",
+        "rust-analyzer.cargo.loadOutDirsFromCheck": "true",
+        "telemetry.enableTelemetry":  "false",
+        "editor.minimap.enabled": false
+	"window.titleBarStyle": "native",
+      "git.autofetch": true,
+      "git.confirmSync": false,
+      "typescript.updateImportsOnFileMove.enabled": "always",
+      "javascript.updateImportsOnFileMove.enabled": "always"
+}

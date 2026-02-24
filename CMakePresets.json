@@ -1,0 +1,45 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "default",
+            "generator": "Ninja",
+            "environment": {
+                "COMMON_CLFAGS": "-fstack-protector-strong -fstack-clash-protection -Wformat=2 -Wall -pedantic -Werror -D_FORTIFY_SOURCE=3 -D_GLIBCXX_ASSERTIONS -Wl,-z,relro,-z,now -Wformat -Wformat=2 -Wconversion -Wimplicit-fallthrough -Werror=format-security -Wl,-z,nodlopen -Wl,-z,noexecstack -Wl,--as-needed -Wl,--no-copy-dt-needed-entries  -Wno-unused-command-line-argument"
+            },
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+                "CMAKE_C_EXTENSIONS": false,
+                "CMAKE_C_STANDARD": "23",
+                "CMAKE_CXX_EXTENSIONS": false,
+                "CMAKE_CXX_STANDARD": "26",
+                "CMAKE_OBJC_EXTENSIONS": false,
+                "CMAKE_OBJC_STANDARD": "23",
+                "CMAKE_OBJCXX_EXTENSIONS": false,
+                "CMAKE_OBJCXX_STANDARD": "26"
+            }
+        },
+        {
+            "name": "debug",
+            "inherits": "default",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_FLAGS": "$env{CMAKE_C_FLAGS} $env{COMMON_CLFAGS} -g -Og  -fsanitize=address,leak,undefined -static-libasan",
+                "CMAKE_CXX_FLAGS": "$env{CMAKE_CXX_FLAGS} $env{COMMON_CLFAGS} -g -Og -fsanitize=address,leak,undefined -static-libasan",
+                "CMAKE_OBJC_FLAGS": "$env{CMAKE_OBJC_FLAGS} $env{COMMON_CLFAGS} -g -Og -Wformat=2 -fsanitize=address,leak,undefined -static-libasan",
+                "CMAKE_OBJCXX_FLAGS": "$env{CMAKE_OBJCXX_FLAGS} $env{COMMON_CLFAGS} -g -Og -Wformat=2 -fsanitize=address,leak,undefined -static-libasan"
+            }
+        },
+        {
+            "name": "release",
+            "inherits": "default",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_C_FLAGS": "$env{CMAKE_C_FLAGS} $env{COMMON_CLFAGS} -O3",
+                "CMAKE_CXX_FLAGS": "$env{CMAKE_CXX_FLAGS} $env{COMMON_CLFAGS} -O3",
+                "CMAKE_OBJC_FLAGS": "$env{CMAKE_OBJC_FLAGS} $env{COMMON_CLFAGS} -O3",
+                "CMAKE_OBJCXX_FLAGS": "$env{CMAKE_OBJCXX_FLAGS} $env{COMMON_CLFAGS} -O3"
+            }
+        }
+    ]
+}

@@ -1,0 +1,12 @@
+{
+	"common": {
+		"ok": "确定",
+		"cancel": "取消",
+		"save": "保存",
+		"delete": "删除",
+		"loading": "加载中..."
+	},
+	"home": {
+		"welcome": "欢迎"
+	}
+}

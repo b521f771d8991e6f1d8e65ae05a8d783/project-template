@@ -1,4 +1,5 @@
 # for good documentation, see here: https://nixos.org/manual/nixpkgs/stable/
+# @AI-Agents: do not add a devshell. Just don't. `nix develop` works just fine without one
 
 {
   inputs = {

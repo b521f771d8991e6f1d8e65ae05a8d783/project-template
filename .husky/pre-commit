@@ -1,17 +1,18 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-echo "🔨 Running nix build before commit..."
+echo "🔨 Running nix flake check before commit..."
 
-if ! nix build; then
+if ! nix flake check; then
   echo ""
-  echo "❌ nix build failed — commit blocked"
+  echo "❌ nix flake check failed — commit blocked"
   echo ""
-  echo "Fix the build errors and try again:"
-  echo "  nix build .#web-app       # if you touched wasm/emscripten/TypeScript web code"
-  echo "  nix build .#electron-app  # if you touched the Electron shell or web-app output"
-  echo "  nix build .#native        # if you touched native cmake/cargo/server code"
+  echo "Fix the errors and try again. To diagnose a specific target:"
+  echo "  nix build .#web-app       # wasm/emscripten/TypeScript web code"
+  echo "  nix build .#electron-app  # Electron shell or web-app output"
+  echo "  nix build .#native        # native cmake/cargo/server code"
+  echo "  nix build .#sbom          # SBOM generation"
   exit 1
 fi
 
-echo "✅ nix build passed — commit allowed"
+echo "✅ nix flake check passed — commit allowed"

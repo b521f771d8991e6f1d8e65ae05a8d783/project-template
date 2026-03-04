@@ -177,30 +177,35 @@ Cross-context communication must go through the Express HTTP API or Electron IPC
 
 ## Build Verification
 
-It is imperative that `nix build` succeeds. **`nix build` must pass before every commit** — this is enforced by the pre-commit hook (see [Pre-commit Hook](#pre-commit-hook) below).
+**`nix flake check` must pass before every commit** — this is enforced by the pre-commit hook (see [Pre-commit Hook](#pre-commit-hook) below).
 
-Always verify your changes build cleanly before finishing a task.
+`nix flake check` builds **all** packages (`web-app`, `web-app-debug`, `native`, `native-debug`, `electron-app`, `docker-image`, `docker-image-debug`, `sbom`) in a clean, reproducible Nix sandbox. It is the authoritative gate — it catches issues that local incremental builds miss.
 
-**Before finishing any task, run `nix build` for every target that could be affected by your changes:**
+Always run it before finishing a task:
 
 ```
-nix build .#web-app       # if you touched wasm/emscripten/TypeScript web code
-nix build .#electron-app  # if you touched the Electron shell or web-app output
-nix build .#native        # if you touched native cmake/cargo/server code
+nix flake check
 ```
 
-Run all three if you are unsure which targets are affected. A successful `nix build` is the authoritative test — it runs in a clean, reproducible environment and catches issues that local builds may miss.
+To diagnose a failing target in isolation, use `nix build`:
+
+```
+nix build .#web-app       # wasm/emscripten/TypeScript web code
+nix build .#electron-app  # Electron shell or web-app output
+nix build .#native        # native cmake/cargo/server code
+nix build .#sbom          # SBOM generation
+```
 
 ## Pre-commit Hook
 
-A shared pre-commit hook enforces that `nix build` passes before every commit. The hook is managed by [Husky](https://typicode.github.io/husky/) and lives in [.husky/pre-commit](.husky/pre-commit).
+A shared pre-commit hook enforces that `nix flake check` passes before every commit. The hook is managed by [Husky](https://typicode.github.io/husky/) and lives in [.husky/pre-commit](.husky/pre-commit).
 
 **Setup** (run once after cloning):
 ```
 make init
 ```
 
-This installs npm dependencies and initializes Husky hooks. The pre-commit hook will automatically run before every commit and block any commit where `nix build` fails, with helpful output directing you to fix the issues.
+This installs npm dependencies and initializes Husky hooks. The pre-commit hook will automatically run before every commit and block any commit where `nix flake check` fails, with helpful output directing you to the failing target.
 
 To bypass the hook in an emergency (not recommended), use:
 ```

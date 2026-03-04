@@ -157,6 +157,7 @@ The TypeScript source is under [typescript/src/](typescript/src/):
 - [typescript/src/app/](typescript/src/app/) — Expo Router screens (file-based routing)
 - [typescript/src/server/](typescript/src/server/) — Express API routes
 - [typescript/src/server.ts](typescript/src/server.ts) — Express entry point (bundled to `dist/main.js` by esbuild)
+- [typescript/src/electron.ts](typescript/src/electron.ts) — Electron main process (bundled to `dist/electron.js` by esbuild)
 - [typescript/src/redux/](typescript/src/redux/) — Redux Toolkit state
 - [typescript/src/components/](typescript/src/components/) — Shared React Native components
 
@@ -166,13 +167,13 @@ This app has three contexts. Use the right APIs for each:
 
 | Context | Entry point | Available APIs |
 |---|---|---|
-| **Electron main** | root [package.json](package.json) `main` → `typescript/dist/main.js` | Full Node.js + Electron APIs |
-| **Express server** | [typescript/src/server.ts](typescript/src/server.ts) | Full Node.js, no DOM, no Electron renderer APIs |
+| **Electron main** | [typescript/src/electron.ts](typescript/src/electron.ts) → `dist/electron.js` | Full Node.js + Electron APIs (`app`, `BrowserWindow`, …) |
+| **Express server** | [typescript/src/server.ts](typescript/src/server.ts) → `dist/main.js` | Full Node.js, no DOM, no Electron renderer APIs |
 | **Expo frontend** | [typescript/src/app/](typescript/src/app/) | React Native / browser APIs only — no `fs`, no `child_process` |
 
-Cross-context communication must go through the Express HTTP API or Electron IPC — do not import server-side modules into frontend code.
+The Electron main process (`electron.ts`) starts Express in-process (using `DISABLE_CLUSTER=1`), waits for it to be ready, then opens a `BrowserWindow` at `http://127.0.0.1:{port}/internal`. The `/internal` route is the embedded app view.
 
-Styling uses **NativeWind** (Tailwind CSS for React Native). Use Tailwind utility classes via `className` props rather than `StyleSheet`.
+Cross-context communication must go through the Express HTTP API or Electron IPC — do not import server-side modules into frontend code.
 
 ## Build Verification
 

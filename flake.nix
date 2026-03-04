@@ -26,7 +26,14 @@
         let
           pkgs = import nixpkgs {
             inherit system;
-            config.allowUnfree = false;
+            config = {
+              allowUnfree = false;
+              # Allow only the Electron binary (unfree due to bundled Chromium).
+              allowUnfreePredicate = pkg: builtins.elem pkg.pname [
+                "electron"
+                "electron-unwrapped"
+              ];
+            };
           };
 
           # Build tools shared by both web-app and native targets.
@@ -231,6 +238,8 @@
           electronApp = pkgs.stdenv.mkDerivation {
             name = "electron-app";
             dontUnpack = true;
+            dontConfigure = true;
+            dontBuild = true;
             nativeBuildInputs = [ pkgs.makeWrapper ];
 
             installPhase = ''
@@ -238,7 +247,7 @@
               cp -r ${webApp}/bin $out/share/electron-app/
               [ -d "${webApp}/wasm" ] && cp -r ${webApp}/wasm $out/share/electron-app/ || true
               makeWrapper ${pkgs.electron}/bin/electron $out/bin/electron-app \
-                --add-flags "$out/share/electron-app/bin/main.js"
+                --add-flags "$out/share/electron-app/bin/electron.js"
             '';
 
             meta.mainProgram = "electron-app";

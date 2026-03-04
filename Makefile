@@ -103,7 +103,7 @@ lint:
 
 sbom:
 	mkdir -p sbom
-	npm sbom --workspace=typescript --sbom-format cyclonedx --output-file sbom/npm-sbom.cdx.json
+	npm sbom --workspace=typescript --package-lock-only --sbom-format cyclonedx --output-file sbom/npm-sbom.cdx.json
 	cargo metadata --format-version 1 > sbom/cargo-metadata.json
 
 # ── Housekeeping ──────────────────────────────────────────────────────────────

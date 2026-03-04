@@ -214,7 +214,9 @@
           });
 
           # SBOM target: generates CycloneDX (npm) and Cargo metadata SBOMs.
-          # All required tools (nodejs, cargo) are already in commonNativeBuildInputs.
+          # --package-lock-only reads the lockfile directly so no node_modules
+          # setup (npmConfigHook / npmDeps) is needed — avoiding the Nix store
+          # path rewrite that breaks npm sbom's purl generation.
           sbom = pkgs.stdenv.mkDerivation {
             name = "sbom";
             src = ./.;
@@ -222,13 +224,11 @@
               nodejs
               cargo
               rustc
-              importNpmLock.npmConfigHook
             ];
-            npmDeps = pkgs.importNpmLock { npmRoot = ./.; };
             buildPhase = "true";
             installPhase = ''
               mkdir -p $out/sbom
-              npm sbom --workspace=typescript --sbom-format cyclonedx --output-file $out/sbom/npm-sbom.cdx.json
+              npm sbom --workspace=typescript --package-lock-only --sbom-format cyclonedx --output-file $out/sbom/npm-sbom.cdx.json
               cargo metadata --format-version 1 > $out/sbom/cargo-metadata.json
             '';
           };

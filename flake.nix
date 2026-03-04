@@ -152,6 +152,7 @@
               mkdir -p $out
               make install-web
               mv ./output/* $out
+              mkdir -p $out/sbom
             '';
 
             meta.mainProgram = "main.js";
@@ -204,6 +205,26 @@
               NODE_ENV = "development";
             };
           });
+
+          # SBOM target: generates CycloneDX (npm) and Cargo metadata SBOMs.
+          # All required tools (nodejs, cargo) are already in commonNativeBuildInputs.
+          sbom = pkgs.stdenv.mkDerivation {
+            name = "sbom";
+            src = ./.;
+            nativeBuildInputs = with pkgs; [
+              nodejs
+              cargo
+              rustc
+              importNpmLock.npmConfigHook
+            ];
+            npmDeps = pkgs.importNpmLock { npmRoot = ./.; };
+            buildPhase = "true";
+            installPhase = ''
+              mkdir -p $out/sbom
+              npm sbom --workspace=typescript --sbom-format cyclonedx --output-file $out/sbom/npm-sbom.cdx.json
+              cargo metadata --format-version 1 > $out/sbom/cargo-metadata.json
+            '';
+          };
 
           # Electron target: wraps the web-app output with the Nix-provided Electron
           # binary to produce a runnable desktop application.
@@ -267,7 +288,7 @@
               }
             ));
         in
-        {
+        rec {
           packages = {
             "web-app" = webApp;
             "web-app-debug" = webAppDebug;
@@ -276,8 +297,11 @@
             "electron-app" = electronApp;
             docker-image = buildImage webApp;
             "docker-image-debug" = buildImage webAppDebug;
+            sbom = sbom;
             default = webApp;
           };
+
+          checks = builtins.removeAttrs packages [ "default" ];
 
           formatter = pkgs.nixfmt-tree;
         }

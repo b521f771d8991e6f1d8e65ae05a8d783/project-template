@@ -1,8 +1,10 @@
 # General
 
-Do not modify [flake.nix](flake.nix). All system-level dependencies are declared there and managed by Nix — do not attempt to install system tools via apt, brew, cargo install, npm install -g, pip, or any other package manager.
+**flake.nix is managed by the project owner.** AI agents may propose changes to [flake.nix](flake.nix) (including adding packages), but must present the full proposed diff to the user and receive explicit approval **before** making any edits. Do not silently modify the flake. This applies to every kind of change: adding packages, modifying derivations, updating inputs, or anything else.
 
-For tools needed at runtime, prefer adding them as TypeScript modules (regular `dependencies`, not `devDependencies`) in [package.json](package.json).
+Do not attempt to install system tools via apt, brew, `cargo install`, `npm install -g`, pip, or any other package manager outside of Nix.
+
+For tools needed at runtime, prefer adding them as TypeScript modules (regular `dependencies`, not `devDependencies`) in [typescript/package.json](typescript/package.json).
 
 ## Build Targets ([Makefile](Makefile))
 
@@ -62,6 +64,24 @@ These live in [typescript/package.json](typescript/package.json) and are invoked
 | `lint` | `make lint` |
 | `prettier` | `make format` |
 
+## React Native — No Plain HTML
+
+This is a **React Native / Expo** app. The frontend must be written exclusively using React Native primitives and the libraries already installed.
+
+- **Never** use HTML elements (`<div>`, `<span>`, `<p>`, `<button>`, etc.) or the DOM API (`document`, `window`, `getElementById`, etc.) in frontend code.
+- Use React Native equivalents: `<View>`, `<Text>`, `<Pressable>`, `<ScrollView>`, `<Image>`, etc.
+- `react-native-web` is included solely to enable `expo export --platform web` — it does not make HTML authoring acceptable.
+
+## Styling
+
+All UI styling uses **NativeWind**, which is already installed (`nativewind` ^4.2.1 in [typescript/package.json](typescript/package.json)).
+
+- Apply styles exclusively through Tailwind utility classes on the `className` prop.
+- **Never** use `StyleSheet.create()` or inline `style` objects — use `className` instead.
+- The NativeWind type shim is at [typescript/nativewind-env.d.ts](typescript/nativewind-env.d.ts).
+- VSCode Tailwind IntelliSense (`bradlc.vscode-tailwindcss`) is pre-installed and configured.
+- For custom design tokens (colors, spacing, etc.) extend [typescript/src/constants/theme.ts](typescript/src/constants/theme.ts) and the Tailwind config — do not hardcode values in components.
+
 ## Language Selection
 
 **Default to TypeScript** for all new code unless there is a clear performance reason not to.
@@ -86,14 +106,14 @@ When in doubt, write TypeScript first. Optimize to Rust only if profiling shows 
 - [Cargo.toml](Cargo.toml) — Rust package definition
 - [flake.nix](flake.nix) — Nix build environment (do not modify)
 
-## Do Not Modify
+## Do Not Modify Without Approval
 
-These files are either generated or carefully tuned — do not edit them:
+These files are either generated or carefully tuned:
 
-- [flake.nix](flake.nix) — Nix environment, all system deps live here
-- [flake.lock](flake.lock) — Nix lockfile, updated only by `nix flake update`
-- [CMakePresets.json](CMakePresets.json) — compiler flags, sanitizers, warning set
-- [Cargo.lock](Cargo.lock) — Rust lockfile, must stay in sync with the Nix build
+- [flake.nix](flake.nix) — Nix environment, all system deps live here. **Propose any change to the user first and wait for explicit approval before editing** (see [General](#general)).
+- [flake.lock](flake.lock) — Nix lockfile, updated only by `nix flake update`. Do not edit manually.
+- [CMakePresets.json](CMakePresets.json) — compiler flags, sanitizers, warning set. Do not edit without a clear technical reason and user approval.
+- [Cargo.lock](Cargo.lock) — Rust lockfile, must stay in sync with the Nix build. Do not edit manually.
 
 ## Native Code Standards
 
@@ -122,6 +142,15 @@ The project has two `package.json` files with distinct roles:
 - No hidden dependencies that might break in edge cases
 
 Add new runtime dependencies to [typescript/package.json](typescript/package.json) unless they are build orchestration tools (like Husky, concurrently, dotenvx) that belong at the root.
+
+**Before adding any new dependency:**
+
+1. Check whether the functionality is already covered by a package that is **already installed**. Review [typescript/package.json](typescript/package.json) (TypeScript/React Native), [Cargo.toml](Cargo.toml) (Rust), and [flake.nix](flake.nix) (system tools) before reaching for something new.
+2. If a new dependency is genuinely needed, it must meet **all** of the following criteria before being added:
+   - Widely adopted and actively maintained (significant download counts, recent releases, responsive maintainers)
+   - Published by a trusted, identifiable publisher on an official registry: [npmjs.com](https://npmjs.com) (TypeScript), [crates.io](https://crates.io) (Rust), or [nixpkgs](https://search.nixos.org/packages) (system)
+   - Has a clear open-source license compatible with the project
+3. For system-level tools (anything that would go in `flake.nix`): propose the addition to the user for approval before modifying the flake (see [General](#general) above).
 
 The TypeScript source is under [typescript/src/](typescript/src/):
 
@@ -212,6 +241,29 @@ The supported locales are:
 | `la.json` | Latin |
 
 If you add a new language, register it in [typescript/src/i18n/index.ts](typescript/src/i18n/index.ts).
+
+## Software Bill of Materials (SBOM)
+
+SBOM generation is built into both the Nix flake and the Makefile.
+
+| Method | Command | Output |
+|---|---|---|
+| Nix (standalone) | `nix build .#sbom` | `result/sbom/` |
+| Nix (bundled with web-app) | `nix build .` / `.#web-app` | `result/sbom/` inside the output |
+| Local | `make sbom` | `sbom/` in the working directory |
+
+Both methods produce the same two files:
+
+| File | Ecosystem | Format |
+|---|---|---|
+| `sbom/npm-sbom.cdx.json` | npm (TypeScript workspace) | CycloneDX JSON |
+| `sbom/cargo-metadata.json` | Rust / Cargo | Cargo metadata JSON |
+
+- `sbom/npm-sbom.cdx.json` is generated by `npm sbom` (built into npm v10+).
+- `sbom/cargo-metadata.json` is generated by `cargo metadata --format-version 1`.
+- The Nix lockfile ([flake.lock](flake.lock)) serves as the SBOM for all system-level inputs — it pins every input with its exact hash.
+
+The CI pipeline generates SBOMs automatically on every push to `main` or `dev` and uploads them as build artifacts alongside the compiled outputs.
 
 ## Testing
 

@@ -63,22 +63,11 @@ jobs:
         .#native .#native-debug \
         .#electron-app \
         .#docker-image .#docker-image-debug \
-        .#sbom \
         --to ${{ runner.temp }}/result
-
-   - name: Generate SBOM
-     run: make sbom
 
    - name: Upload artifact
      uses: actions/upload-artifact@v4
      with:
       name: digests-${{ runner.os }}-${{ runner.arch }}
       path: ${{ runner.temp }}/result
-      if-no-files-found: error
-
-   - name: Upload SBOM
-     uses: actions/upload-artifact@v4
-     with:
-      name: sbom-${{ runner.os }}-${{ runner.arch }}
-      path: sbom/
       if-no-files-found: error

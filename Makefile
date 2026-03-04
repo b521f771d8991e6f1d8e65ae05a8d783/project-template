@@ -18,7 +18,6 @@ endif
         test test-web test-native \
         install-web install-native \
         format format-native lint \
-        sbom \
         clean init dev
 
 # ── Default ───────────────────────────────────────────────────────────────────
@@ -98,13 +97,6 @@ format-native:
 lint:
 	npm run lint --workspace=typescript
 	run-clang-tidy -checks "clang-analyzer-*,bugprone-*,portability-*,cert-*,darwin-*,objc-*,concurrency-*,boost-*" -fix -p .cmake -j4
-
-# ── SBOM ──────────────────────────────────────────────────────────────────────
-
-sbom:
-	mkdir -p sbom
-	npm sbom --workspace=typescript --package-lock-only --sbom-format cyclonedx --output-file sbom/npm-sbom.cdx.json
-	cargo metadata --format-version 1 > sbom/cargo-metadata.json
 
 # ── Housekeeping ──────────────────────────────────────────────────────────────
 

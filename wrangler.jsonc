@@ -1,0 +1,12 @@
+{
+  // Cloudflare Pages deployment — builds via nix
+  // Deployed automatically via Cloudflare Git integration
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "web-app",
+  "compatibility_date": "2026-03-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "pages": {
+    "build_command": "curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install linux --no-confirm --init none && . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && nix build --accept-flake-config",
+    "build_output_dir": "result"
+  }
+}

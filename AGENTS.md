@@ -195,6 +195,11 @@ nix build .#electron-app  # Electron shell or web-app output
 nix build .#native        # native cmake/cargo/server code
 ```
 
+## Git Conventions
+
+- **All commits must be signed** (GPG or SSH). Use `git commit -S` or configure `commit.gpgsign = true`.
+- **Do not add `Co-authored-by: Claude` (or any AI co-author) trailers** to commit messages.
+
 ## Pre-commit Hook
 
 A shared pre-commit hook enforces that `nix flake check` passes before every commit. The hook is managed by [Husky](https://typicode.github.io/husky/) and lives in [.husky/pre-commit](.husky/pre-commit).

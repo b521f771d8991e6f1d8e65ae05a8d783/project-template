@@ -2,14 +2,7 @@ name: Nix Flake ❄️
 on:
  workflow_dispatch:
  push:
-    branches:
-      - main
-      - dev
  pull_request:
-    branches:
-      - main
-      - dev
- # we do not need a schedule here, since nix is reproducible
 
 jobs:
  build:
@@ -19,7 +12,7 @@ jobs:
    actions: write
   strategy:
    matrix:
-    os: [KRAKAU]
+    os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-13]
   runs-on: ${{ matrix.os }}
   steps:
    # Pin to version tags — for max supply-chain security upgrade to pinned SHAs
@@ -71,3 +64,22 @@ jobs:
       name: digests-${{ runner.os }}-${{ runner.arch }}
       path: ${{ runner.temp }}/result
       if-no-files-found: error
+
+   - name: Push Docker image to GHCR
+     if: runner.os == 'Linux'
+     env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
+     run: |
+      nix --extra-experimental-features "flakes nix-command" build .#docker-image
+      IMAGE_TAG="${GITHUB_SHA::8}"
+      nix --extra-experimental-features "flakes nix-command" shell nixpkgs#skopeo -c \
+        skopeo copy \
+          "docker-archive:$(readlink -f result)" \
+          "docker://${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}" \
+          --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}"
+      nix --extra-experimental-features "flakes nix-command" shell nixpkgs#skopeo -c \
+        skopeo copy \
+          "docker-archive:$(readlink -f result)" \
+          "docker://${REGISTRY}/${IMAGE_NAME}:latest" \
+          --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}"

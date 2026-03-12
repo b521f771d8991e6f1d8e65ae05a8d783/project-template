@@ -6,17 +6,15 @@ PLATFORM := $(shell rustc -vV 2>/dev/null | sed -n 's|host: ||p')
 export VARIANT NODE_ENV PLATFORM
 
 CARGO_FLAGS    :=
-WASM_PACK_FLAGS :=
+WASM_TARGET    := wasm32-unknown-unknown
 ifeq ($(VARIANT),release)
   CARGO_FLAGS     := --release
-  WASM_PACK_FLAGS := --release
 endif
 
 .PHONY: all \
-        web web-wasm web-rust typescript-web \
-        native native-cmake native-rust typescript-server \
-        test test-web test-native \
-        install-web install-native \
+        web native-cmake native-rust wasm swift-lib typescript \
+        test test-web \
+        install-web \
         format format-native lint \
         clean init dev
 
@@ -24,24 +22,9 @@ endif
 
 all: web
 
-# ── Web-app (emscripten + wasm-pack + TypeScript) ─────────────────────────────
+# ── Web-app (cmake + cargo + swift + TypeScript) ─────────────────────────────
 
-web: web-wasm web-rust typescript-web
-
-web-wasm:
-	emcmake cmake -S . -B .cmake-emscripten -G Ninja
-	cmake --build .cmake-emscripten
-
-web-rust:
-	cargo build $(CARGO_FLAGS)
-	wasm-pack build $(WASM_PACK_FLAGS) --target web --out-dir target/npm-pkg
-
-typescript-web:
-	npm run build --workspace=typescript
-
-# ── Native (cmake + cargo + server bundle) ────────────────────────────────────
-
-native: native-cmake native-rust typescript-server
+web: native-cmake native-rust wasm swift-lib typescript
 
 native-cmake:
 	cmake -G Ninja -S . -B .cmake --preset $(VARIANT)
@@ -50,32 +33,33 @@ native-cmake:
 native-rust:
 	cargo build $(CARGO_FLAGS)
 
-typescript-server:
-	npm run build:server --workspace=typescript
+wasm:
+	cargo build --target $(WASM_TARGET) $(CARGO_FLAGS)
+	wasm-bindgen --target web --out-dir target/npm-pkg target/$(WASM_TARGET)/$(VARIANT)/rust.wasm
+
+swift-lib:
+ifndef SWIFT_LIB_PREBUILT
+	swift build -c $(VARIANT)
+else
+	@echo "Using prebuilt Swift library from $(SWIFT_LIB_PREBUILT)"
+endif
+
+typescript:
+	npm run build --workspace=typescript
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
-test: test-web test-native
+test: test-web
 
 test-web:
-	emcmake ctest --test-dir .cmake-emscripten
-	cargo test
-	npm run test --workspace=typescript
-
-test-native:
 	ctest --test-dir .cmake
 	cargo test
+	swift test
 	npm run test --workspace=typescript
 
 # ── Install ───────────────────────────────────────────────────────────────────
 
 install-web:
-	mkdir -p ./output/bin ./output/wasm
-	cp -a ./typescript/dist/* ./output/bin
-	chmod +x ./output/bin/*
-	cp -a target/npm-pkg/* ./output/wasm/
-
-install-native:
 	mkdir -p ./output/bin ./output/lib
 	cp -a ./typescript/dist/* ./output/bin
 	chmod +x ./output/bin/*
@@ -102,7 +86,7 @@ lint:
 
 clean:
 	rm -rf dist target node_modules typescript/node_modules \
-	  .expo .cmake .cmake-emscripten output result .build
+	  .expo .cmake output result .build
 
 init:
 	npm install

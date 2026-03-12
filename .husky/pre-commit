@@ -8,10 +8,12 @@ if ! nix flake check; then
   echo "❌ nix flake check failed — commit blocked"
   echo ""
   echo "Fix the errors and try again. To diagnose a specific target:"
-  echo "  nix build .#web-app       # wasm/emscripten/TypeScript web code"
-  echo "  nix build .#electron-app  # Electron shell or web-app output"
-  echo "  nix build .#native        # native cmake/cargo/server code"
-  echo "  nix build .#sbom          # SBOM generation"
+  echo "  nix build .#native-lib       # C/C++/ObjC cmake library"
+  echo "  nix build .#rust-lib         # Rust native library"
+  echo "  nix build .#wasm-pkg         # Rust → WASM package"
+  echo "  nix build .#swift-lib        # Swift library"
+  echo "  nix build .#typescript-app   # TypeScript/Expo web app"
+  echo "  nix build .#web-app          # Combined output"
   exit 1
 fi
 

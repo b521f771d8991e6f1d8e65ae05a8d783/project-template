@@ -42,19 +42,13 @@ jobs:
      with:
        use-flakehub: false
 
-   - name: Lint and test
-     run: |
-      make lint
-      make test
-
-   - name: Build Nix Flake
+   - name: Build and test Nix Flake
      run: |
       nix --extra-experimental-features "flakes nix-command" flake check -L --show-trace
       mkdir ${{ runner.temp }}/result
       nix --extra-experimental-features "flakes nix-command" copy --no-check-sigs \
         .#web-app .#web-app-debug \
-        .#native .#native-debug \
-        .#electron-app \
+        .#native-lib .#rust-lib .#wasm-pkg .#swift-lib .#typescript-app \
         .#docker-image .#docker-image-debug \
         --to ${{ runner.temp }}/result
 

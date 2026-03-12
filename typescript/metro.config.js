@@ -14,7 +14,7 @@ if (
 const config = getDefaultConfig(__dirname);
 config.watchFolders = [
 	...config.watchFolders,
-	path.resolve(__dirname, "../target/npm-pkg"),
+	path.resolve(__dirname, "../rust/target/npm-pkg"),
 ];
 
 // Add wasm asset support

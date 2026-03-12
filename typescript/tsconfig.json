@@ -17,7 +17,7 @@
 			"@/*": ["./src/*"],
 			"@assets/*": ["./assets/*"],
 			"@public/*": ["./public/*"],
-			"rust": ["../target/npm-pkg"]
+			"rust": ["../rust/target/npm-pkg"]
 		}
 	},
 	"include": [

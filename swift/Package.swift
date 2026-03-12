@@ -12,10 +12,10 @@ let package = Package(
     targets: [
         .target(
             name: "project-template",
-            path: "swift/Sources/project-template"),
+            path: "Sources/project-template"),
         .testTarget(
             name: "project-templateTests",
             dependencies: ["project-template"],
-            path: "swift/Tests/project-templateTests"),
+            path: "Tests/project-templateTests"),
     ]
 )

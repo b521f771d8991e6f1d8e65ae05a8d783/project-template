@@ -44,81 +44,85 @@
             rustc = rustToolchain;
           };
 
-          # Build tools shared across targets.
-          commonNativeBuildInputs = with pkgs; [
-            # general tools
-            git
-            zsh
-            pkg-config
-            cmake
-            ninja
-            python3
-            which
+          # ── Native C/C++/ObjC library (CMake + Ninja) ─────────────────
+          nativeLib = pkgs.clangStdenv.mkDerivation {
+            name = "native-lib";
+            src = ./native;
 
-            # native tools
-            clang
-            lld
-            clang-tools
+            nativeBuildInputs = with pkgs; [
+              cmake
+              ninja
+              lld
+            ];
 
-            # rust tools (includes wasm32-unknown-unknown target)
-            rustToolchain
-            bacon
-            wasm-pack
-            wasm-bindgen-cli
+            env.PROJECT_NAME = "native-lib";
 
-            # swift tools
-            swift
-            swiftPackages.swiftpm
-            swiftPackages.Dispatch
-            swiftPackages.Foundation
+            configurePhase = ''
+              cmake -G Ninja -S . -B build --preset release
+            '';
 
-            # node tools
-            nodejs
-            pkgs.importNpmLock.npmConfigHook
+            buildPhase = ''
+              cmake --build build
+            '';
 
-            (vscode-with-extensions.override {
-              vscode = vscodium;
-              vscodeExtensions =
-                with vscode-extensions;
-                [
-                  # generic tools
-                  docker.docker
-                  bbenoist.nix
-                  streetsidesoftware.code-spell-checker
-                  humao.rest-client
-                  ms-vscode.cmake-tools
-                  esbenp.prettier-vscode
-                  dbaeumer.vscode-eslint
-                  github.github-vscode-theme
-                  christian-kohler.npm-intellisense
-                  wix.vscode-import-cost
-                  bradlc.vscode-tailwindcss
+            checkPhase = ''
+              ctest --test-dir build
+            '';
 
-                  # languages, typescript is included
-                  rust-lang.rust-analyzer
-                  llvm-vs-code-extensions.vscode-clangd
-                ]
-                ++ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
-                  {
-                    name = "excalidraw-editor";
-                    publisher = "pomdtr";
-                    version = "3.9.1";
-                    sha256 = "sha256-/LqC8GUBEDs+yGYCIX8RQtxDmWogTTiTiF/WJiCuEj4=";
-                  }
-                  {
-                    name = "swift-vscode";
-                    publisher = "swiftlang";
-                    version = "2.16.1";
-                    sha256 = "sha256-xNWflrWVU2KHN/w1vDXGD/+/ctpWdrndFi6aHTEhGao=";
-                  }
-                ];
-            })
-          ];
+            installPhase = ''
+              mkdir -p $out/lib
+              cp build/libcore.so $out/lib/ 2>/dev/null || true
+              cp build/libcore.dylib $out/lib/ 2>/dev/null || true
+            '';
+          };
 
-          # Swift library, built with swiftPackages.stdenv for Foundation support.
+          # ── Rust native library (buildRustPackage) ─────────────────────
+          rustLib = rustPlatform.buildRustPackage {
+            pname = "rust-lib";
+            version = "0.1.0";
+            src = ./rust;
+
+            cargoLock.lockFile = ./rust/Cargo.lock;
+
+            installPhase = ''
+              runHook preInstall
+              mkdir -p $out/lib
+              find target -path "*/release/librust*" -type f -exec cp {} $out/lib/ \;
+              runHook postInstall
+            '';
+          };
+
+          # ── Rust WASM package (buildRustPackage → wasm-bindgen) ────────
+          wasmPkg = rustPlatform.buildRustPackage {
+            pname = "wasm-pkg";
+            version = "0.1.0";
+            src = ./rust;
+
+            cargoLock.lockFile = ./rust/Cargo.lock;
+
+            nativeBuildInputs = [ pkgs.wasm-bindgen-cli ];
+
+            buildPhase = ''
+              runHook preBuild
+              cargo build --target wasm32-unknown-unknown --release
+              runHook postBuild
+            '';
+
+            doCheck = false;
+
+            installPhase = ''
+              runHook preInstall
+              mkdir -p $out
+              wasm-bindgen --target web --out-dir $out \
+                target/wasm32-unknown-unknown/release/rust.wasm
+              runHook postInstall
+            '';
+          };
+
+          # ── Swift library (swiftPackages.stdenv) ───────────────────────
           swiftLib = pkgs.swiftPackages.stdenv.mkDerivation {
             name = "swift-lib";
-            src = ./.;
+            src = ./swift;
 
             nativeBuildInputs = with pkgs; [
               swift
@@ -149,29 +153,105 @@
             '';
           };
 
-          # Builds Rust, native C/C++, Swift and Node into one web-app output.
-          webApp = rustPlatform.buildRustPackage {
+          # ── TypeScript/Node.js app (buildNpmPackage) ──────────────────
+          typescriptApp = pkgs.buildNpmPackage {
+            pname = "typescript-app";
+            version = "0.0.0";
+            src = ./typescript;
+
+            npmDeps = pkgs.importNpmLock { npmRoot = ./typescript; };
+            npmConfigHook = pkgs.importNpmLock.npmConfigHook;
+
+            nativeBuildInputs = with pkgs; [ zsh ];
+
+            env.NODE_ENV = "production";
+
+            preBuild = ''
+              export HOME=$TMPDIR
+              # Link WASM package where metro/tsconfig expect it
+              mkdir -p ../rust/target/npm-pkg
+              cp -r ${wasmPkg}/* ../rust/target/npm-pkg/
+            '';
+
+            # npmBuildScript defaults to "build", which runs the package.json build script
+
+            checkPhase = ''
+              npx jest
+            '';
+
+            installPhase = ''
+              runHook preInstall
+              mkdir -p $out/bin
+              cp -r dist/* $out/bin/
+              chmod +x $out/bin/*
+              runHook postInstall
+            '';
+          };
+
+          # ── Combined web app (assembles all components) ────────────────
+          webApp = pkgs.stdenv.mkDerivation {
             name = "web-app";
-            src = ./.;
+            dontUnpack = true;
+            dontConfigure = true;
+            dontBuild = true;
+            dontCheck = true;
 
-            cargoLock = {
-              lockFile = ./Cargo.lock;
-            };
-
-            env = {
-              CC = "${pkgs.clang}/bin/clang";
-              CXX = "${pkgs.clang}/bin/clang++";
-              OBJC = webApp.CC;
-              OBJCXX = webApp.CXX;
-
-              VARIANT = "release";
-              NODE_ENV = "production";
-              PROJECT_NAME = "web-app";
-            };
-
-            npmDeps = pkgs.importNpmLock { npmRoot = ./.; };
-
-            nativeBuildInputs = commonNativeBuildInputs;
+            # Dev tools for `nix develop`
+            nativeBuildInputs = with pkgs; [
+              git
+              zsh
+              pkg-config
+              cmake
+              ninja
+              python3
+              which
+              clang
+              lld
+              clang-tools
+              rustToolchain
+              bacon
+              wasm-pack
+              wasm-bindgen-cli
+              swift
+              swiftPackages.swiftpm
+              swiftPackages.Dispatch
+              swiftPackages.Foundation
+              nodejs
+              (vscode-with-extensions.override {
+                vscode = vscodium;
+                vscodeExtensions =
+                  with vscode-extensions;
+                  [
+                    docker.docker
+                    bbenoist.nix
+                    streetsidesoftware.code-spell-checker
+                    humao.rest-client
+                    ms-vscode.cmake-tools
+                    esbenp.prettier-vscode
+                    dbaeumer.vscode-eslint
+                    github.github-vscode-theme
+                    christian-kohler.npm-intellisense
+                    wix.vscode-import-cost
+                    bradlc.vscode-tailwindcss
+                    rust-lang.rust-analyzer
+                    llvm-vs-code-extensions.vscode-clangd
+                  ]
+                  ++ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
+                    {
+                      name = "excalidraw-editor";
+                      publisher = "pomdtr";
+                      version = "3.9.1";
+                      sha256 = "sha256-/LqC8GUBEDs+yGYCIX8RQtxDmWogTTiTiF/WJiCuEj4=";
+                    }
+                    {
+                      name = "swift-vscode";
+                      publisher = "swiftlang";
+                      version = "2.16.1";
+                      sha256 = "sha256-xNWflrWVU2KHN/w1vDXGD/+/ctpWdrndFi6aHTEhGao=";
+                    }
+                  ];
+              })
+            ];
 
             runtimeDeps = with pkgs; [
               nodejs-slim
@@ -180,36 +260,19 @@
 
             buildInputs = webApp.runtimeDeps;
 
-            buildPhase = ''
-              export HOME=$TMPDIR/home
-              mkdir -p $HOME
-              CC=${webApp.CC} CXX=${webApp.CXX} SWIFT_LIB_PREBUILT=${swiftLib} make web
-            '';
-
-            # swift test requires swiftPackages.stdenv; run it via swiftLib instead
-            checkPhase = ''
-              ctest --test-dir .cmake
-              cargo test
-              npm run test --workspace=typescript
-            '';
-
             installPhase = ''
-              mkdir -p $out
-              make install-web
-              mv ./output/* $out
+              mkdir -p $out/bin $out/lib
+              cp -a ${typescriptApp}/bin/* $out/bin/
+              cp -a ${nativeLib}/lib/* $out/lib/
+              cp -a ${rustLib}/lib/* $out/lib/
               cp -a ${swiftLib}/lib/* $out/lib/
             '';
 
             meta.mainProgram = "main.js";
           };
 
-          webAppDebug = webApp.overrideAttrs (old: {
+          webAppDebug = webApp.overrideAttrs (_: {
             name = "web-app-debug";
-            env = old.env // {
-              VARIANT = "debug";
-              NODE_ENV = "development";
-              PROJECT_NAME = old.name;
-            };
           });
 
           buildImage =
@@ -260,6 +323,11 @@
           packages = {
             "web-app" = webApp;
             "web-app-debug" = webAppDebug;
+            "native-lib" = nativeLib;
+            "rust-lib" = rustLib;
+            "wasm-pkg" = wasmPkg;
+            "swift-lib" = swiftLib;
+            "typescript-app" = typescriptApp;
             docker-image = buildImage webApp;
             "docker-image-debug" = buildImage webAppDebug;
             default = webApp;

@@ -1,11 +1,11 @@
 node_modules
 
 # Swift parts
-/.build
+/swift/.build
 
 # Rust parts
-/target
-/target/pkg
+/rust/target
+/rust/target/pkg
 
 # For the native parts
 /.cmake

@@ -44,6 +44,54 @@
             rustc = rustToolchain;
           };
 
+          # ── Auto-discover Rust binaries ──────────────────────────────
+          cargoToml = builtins.fromTOML (builtins.readFile ./rust/Cargo.toml);
+
+          rustBinNames =
+            let
+              # [[bin]] entries from Cargo.toml
+              explicit = if cargoToml ? bin then map (b: b.name) cargoToml.bin else [ ];
+              # src/main.rs → binary named after the package
+              main = if builtins.pathExists ./rust/src/main.rs then [ cargoToml.package.name ] else [ ];
+              # src/bin/*.rs and src/bin/*/main.rs
+              binDir = ./rust/src/bin;
+              auto =
+                if builtins.pathExists binDir then
+                  let
+                    entries = builtins.readDir binDir;
+                    names = builtins.attrNames entries;
+                  in
+                  (map (n: pkgs.lib.removeSuffix ".rs" n) (
+                    builtins.filter (n: entries.${n} == "regular" && pkgs.lib.hasSuffix ".rs" n) names
+                  ))
+                  ++ (builtins.filter (
+                    n: entries.${n} == "directory" && builtins.pathExists (binDir + "/${n}/main.rs")
+                  ) names)
+                else
+                  [ ];
+            in
+            pkgs.lib.unique (explicit ++ main ++ auto);
+
+          rustBins = builtins.listToAttrs (
+            map (binName: {
+              name = "rust-${binName}";
+              value = rustPlatform.buildRustPackage {
+                pname = binName;
+                version = cargoToml.package.version;
+                src = ./rust;
+                cargoLock.lockFile = ./rust/Cargo.lock;
+                cargoBuildFlags = [
+                  "--bin"
+                  binName
+                ];
+                cargoTestFlags = [
+                  "--bin"
+                  binName
+                ];
+              };
+            }) rustBinNames
+          );
+
           # ── Native C/C++/ObjC library (CMake + Ninja) ─────────────────
           nativeLib = pkgs.clangStdenv.mkDerivation {
             name = "native-lib";
@@ -331,7 +379,8 @@
             docker-image = buildImage webApp;
             "docker-image-debug" = buildImage webAppDebug;
             default = webApp;
-          };
+          }
+          // rustBins;
 
           checks = builtins.removeAttrs packages [ "default" ];
 

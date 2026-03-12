@@ -11,5 +11,4 @@ rusqlite = "0.38.0"
 rust-embed = "8.11.0"
 
 [lib]
-path = "lib.rs"
 crate-type = ["cdylib", "staticlib", "rlib"]

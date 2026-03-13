@@ -1,13 +1,25 @@
 {
-	"editor.tabSize":  2,
-  	"editor.formatOnSave": true,
-        "files.autoSave": "onFocusChange",
-        "rust-analyzer.cargo.loadOutDirsFromCheck": "true",
-        "telemetry.enableTelemetry":  "false",
-        "editor.minimap.enabled": false
-	"window.titleBarStyle": "native",
+      "editor.tabSize": 2,
+      "editor.formatOnSave": true,
+      "files.autoSave": "onFocusChange",
+      "rust-analyzer.cargo.loadOutDirsFromCheck": "true",
+      "telemetry.enableTelemetry": "false",
+      "editor.minimap.enabled": false,
+      "window.titleBarStyle": "native",
       "git.autofetch": true,
       "git.confirmSync": false,
       "typescript.updateImportsOnFileMove.enabled": "always",
-      "javascript.updateImportsOnFileMove.enabled": "always"
+      "javascript.updateImportsOnFileMove.enabled": "always",
+      "json.schemaDownload.enable": true,
+      "clangd.arguments": [
+            "--compile-commands-dir=${workspaceFolder}/native/build",
+            "--header-insertion=never"
+      ],
+      "cmake.sourceDirectory": "${workspaceFolder}/native",
+      "cmake.buildDirectory": "${workspaceFolder}/native/build",
+      "cmake.configureOnOpen": true,
+      "cmake.generator": "Ninja",
+      "json.schemaDownload.trustedDomains": {
+            "https://cdn.jsdelivr.net": true
+      }
 }

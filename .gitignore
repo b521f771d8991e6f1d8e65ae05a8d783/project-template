@@ -1,27 +1,21 @@
 node_modules
 
-# Swift parts
+# Swift
 /swift/.build
 
-# Rust parts
+# Rust
 /rust/target
-/rust/target/pkg
 
-# For the native parts
-/.cmake
-/out
-/.cmake-emscripten
-/dependencies/vcpkg/buildtrees
-/dependencies/vcpkg/downloads
-/dependencies/vcpkg/packages
-/dependencies/vcpkg/vcpkg
+# Native (CMake)
+/native/.cmake
+/native/.cmake-emscripten
+/native/out
+/native/dependencies/vcpkg/buildtrees
+/native/dependencies/vcpkg/downloads
+/native/dependencies/vcpkg/packages
+/native/dependencies/vcpkg/vcpkg
 
-# By our build process
-/output
-
-# important for nix
+# Nix
 /result
 
-/index.d.ts
-/index.node
 /.claude

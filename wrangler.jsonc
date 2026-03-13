@@ -1,12 +1,16 @@
 {
-  // Cloudflare Pages deployment — builds via nix
+  // Cloudflare Workers deployment — builds via nix
   // Deployed automatically via Cloudflare Git integration
-  "$schema": "node_modules/wrangler/config-schema.json",
+  "$schema": "https://cdn.jsdelivr.net/npm/wrangler/config-schema.json",
   "name": "web-app",
+  "main": "result/worker.js",
   "compatibility_date": "2026-03-01",
   "compatibility_flags": [
     "nodejs_compat"
   ],
+  "assets": {
+    "directory": "result/assets"
+  },
   "build": {
     "command": "nix build .#cloudflare"
   }

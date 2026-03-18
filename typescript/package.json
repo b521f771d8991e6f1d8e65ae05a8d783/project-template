@@ -6,7 +6,7 @@
   "scripts": {
     "build": "expo export --platform web && esbuild src/server.ts --outfile=./dist/main.js --platform=node --bundle --minify",
     "build:server": "esbuild src/server.ts --outfile=./dist/main.js --platform=node --bundle --minify",
-    "build:worker": "expo export --platform web && esbuild src/worker.ts --outfile=./dist/worker.js --platform=browser --bundle --minify --format=esm",
+    "build:worker": "expo export --platform web && esbuild src/worker.ts --outfile=./dist/worker.js --platform=browser --bundle --minify --format=esm --external:node:*",
     "start": "expo start -c",
     "test": "jest",
     "lint": "expo lint",

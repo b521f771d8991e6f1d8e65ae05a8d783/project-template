@@ -12,7 +12,7 @@ jobs:
    actions: write
   strategy:
    matrix:
-    os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-13]
+    os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
   runs-on: ${{ matrix.os }}
   steps:
    # Pin to version tags — for max supply-chain security upgrade to pinned SHAs

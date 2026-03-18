@@ -9,7 +9,6 @@
       "git.autofetch": true,
       "git.confirmSync": false,
       "typescript.updateImportsOnFileMove.enabled": "always",
-      "javascript.updateImportsOnFileMove.enabled": "always",
       "json.schemaDownload.enable": true,
       "clangd.arguments": [
             "--compile-commands-dir=${workspaceFolder}/native/build",

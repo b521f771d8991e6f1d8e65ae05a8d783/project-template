@@ -7,6 +7,7 @@ node_modules
 /rust/target
 
 # Native (CMake)
+/native/build
 /native/.cmake
 /native/.cmake-emscripten
 /native/out
@@ -15,7 +16,15 @@ node_modules
 /native/dependencies/vcpkg/packages
 /native/dependencies/vcpkg/vcpkg
 
+# TypeScript
+/typescript/dist
+
+# Make install output
+/dist
+
 # Nix
 /result
 
 /.claude
+/.lear
+wrangler

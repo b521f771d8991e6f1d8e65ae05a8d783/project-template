@@ -1,50 +1,50 @@
-# Welcome to your Expo app 👋
+# project-template
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Full-stack polyglot template: Expo (React Native + Web) frontend, Express backend, with native libraries in C/C++/Objective-C, Rust, and Swift. Deploys as a Node server or Cloudflare Worker.
 
-## Get started
+## Prerequisites
 
-1. Install dependencies
+[Nix](https://nixos.org/) with flakes enabled. All toolchains (clang, Rust, Swift, Node.js, wasm-bindgen, etc.) are provided by the flake.
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Quick start
 
 ```bash
-npm run reset-project
+nix develop    # enter dev shell with all tools
+make dev       # build everything + start Expo dev server
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Build targets
 
-## Learn more
+| Command | Description |
+|---|---|
+| `make dev` | Build all libraries + start Expo dev server |
+| `make release` | Production build (native + Rust + Swift + WASM + TypeScript) |
+| `make debug` | Debug build with sanitizers |
+| `make test` | Run all test suites |
+| `make clean` | Remove all build artifacts |
+| `make format` | Format with `nix fmt` |
 
-To learn more about developing your project with Expo, look at the following resources:
+Individual targets: `build-native`, `build-rust`, `build-swift`, `build-typescript`, `wasm`, and their debug/test/clean variants.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Project structure
 
-## Join the community
+```
+native/       C/C++/Objective-C shared library (CMake + Ninja)
+rust/         Rust library + WASM target
+swift/        Swift package
+typescript/   Expo app (React Native + Web) + Express server + Cloudflare Worker
+flake.nix     Nix flake: dev shell, packages, Docker images
+Makefile      Orchestrates all builds
+```
 
-Join our community of developers creating universal apps.
+## Nix packages
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+nix build .#web-app          # full app (default)
+nix build .#native-lib       # C/C++/ObjC shared library
+nix build .#rust-lib          # Rust library
+nix build .#swift-lib         # Swift library
+nix build .#typescript-app    # TypeScript bundle
+nix build .#cloudflare        # Cloudflare Worker bundle
+nix build .#docker-image      # Docker image
+```

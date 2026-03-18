@@ -1,5 +1,4 @@
 # for good documentation, see here: https://nixos.org/manual/nixpkgs/stable/
-# @AI-Agents: do not add a devshell. Just don't. `nix develop` works just fine without one
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs";
@@ -75,6 +74,16 @@
           rustc = rt;
         };
 
+      mkSrcWith =
+        dir:
+        lib.fileset.toSource {
+          root = ./.;
+          fileset = lib.fileset.unions [
+            ./Makefile
+            dir
+          ];
+        };
+
       mkWasmPkg =
         pkgs:
         (mkRustPlatform pkgs).buildRustPackage {
@@ -140,6 +149,31 @@
           rustPlatform = mkRustPlatform pkgs;
           wasmPkg = mkWasmPkg pkgs;
 
+          # ── Shared toolchains (devShell + webApp) ──────────────────
+          devTools = with pkgs; [
+            git
+            zsh
+            pkg-config
+            cmake
+            ninja
+            python3
+            which
+            clang
+            lld
+            clang-tools
+            gnustep-libobjc
+            esbuild
+            rustToolchain
+            bacon
+            wasm-pack
+            wasm-bindgen-cli
+            swift
+            swiftPackages.swiftpm
+            swiftPackages.Dispatch
+            swiftPackages.Foundation
+            nodejs
+          ];
+
           rustBins = builtins.listToAttrs (
             map (binName: {
               name = "rust-${binName}";
@@ -162,20 +196,21 @@
 
           nativeLib = pkgs.clangStdenv.mkDerivation {
             name = "native-lib";
-            src = ./native;
+            src = mkSrcWith ./native;
             nativeBuildInputs = with pkgs; [
               cmake
               ninja
               lld
+              gnustep-libobjc
             ];
             env.PROJECT_NAME = "native-lib";
-            configurePhase = "cmake -G Ninja -S . -B build --preset release";
-            buildPhase = "cmake --build build";
-            checkPhase = "ctest --test-dir build";
+            configurePhase = "true";
+            buildPhase = "make build-native";
+            checkPhase = "make test-native";
             installPhase = ''
               mkdir -p $out/lib
-              cp build/libcore.so $out/lib/ 2>/dev/null || true
-              cp build/libcore.dylib $out/lib/ 2>/dev/null || true
+              cp native/build/libcore.so $out/lib/ 2>/dev/null || true
+              cp native/build/libcore.dylib $out/lib/ 2>/dev/null || true
             '';
           };
 
@@ -194,7 +229,7 @@
 
           swiftLib = pkgs.swiftPackages.stdenv.mkDerivation {
             name = "swift-lib";
-            src = ./swift;
+            src = mkSrcWith ./swift;
             nativeBuildInputs = with pkgs; [
               swift
               swiftPackages.swiftpm
@@ -202,20 +237,18 @@
               swiftPackages.Foundation
               swiftPackages.XCTest
             ];
+            env.LD_LIBRARY_PATH = "${pkgs.swiftPackages.Dispatch}/lib";
             buildPhase = ''
               export HOME=$TMPDIR
-              export LD_LIBRARY_PATH=${pkgs.swiftPackages.Dispatch}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
-              swift build -c release
+              make build-swift
             '';
             checkPhase = ''
               export HOME=$TMPDIR
-              export LD_LIBRARY_PATH=${pkgs.swiftPackages.Dispatch}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
-              swift test
+              make test-swift
             '';
             installPhase = ''
-              export LD_LIBRARY_PATH=${pkgs.swiftPackages.Dispatch}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
               mkdir -p $out/lib/swift
-              buildDir=$(swift build -c release --show-bin-path)
+              buildDir=$(cd swift && swift build -c release --show-bin-path)
               cp "$buildDir"/*.swiftmodule "$buildDir"/*.swiftdoc "$buildDir"/*.swiftsourceinfo $out/lib/swift/ 2>/dev/null || true
               cp "$buildDir"/project_template.build/*.o $out/lib/ 2>/dev/null || true
             '';
@@ -227,8 +260,12 @@
             src = ./typescript;
             npmDeps = pkgs.importNpmLock { npmRoot = ./typescript; };
             npmConfigHook = pkgs.importNpmLock.npmConfigHook;
-            nativeBuildInputs = with pkgs; [ zsh ];
+            nativeBuildInputs = with pkgs; [
+              zsh
+              esbuild
+            ];
             env.NODE_ENV = "production";
+            env.ESBUILD_BINARY_PATH = "${pkgs.esbuild}/bin/esbuild";
             preBuild = ''
               export HOME=$TMPDIR
               mkdir -p ../rust/target/npm-pkg
@@ -239,19 +276,25 @@
               # Expo static export + Node server
               npm run build
               # Cloudflare Worker entry point
-              npx esbuild src/worker.ts --outfile=./dist/worker.js --platform=browser --bundle --minify --format=esm
+              npx esbuild src/worker.ts --outfile=./dist/worker.js --platform=browser --bundle --minify --format=esm '--external:node:*'
               runHook postBuild
             '';
             checkPhase = "npx jest";
             installPhase = ''
               runHook preInstall
-              mkdir -p $out/bin $out/worker
-              cp -r dist/client dist/server dist/main.js $out/bin/
-              chmod +x $out/bin/main.js
-              cp dist/worker.js $out/worker/
-              cp -r dist/client $out/worker/assets
+              make -f ${./Makefile} install \
+                DIST=$out \
+                TS_DIST=dist \
+                NATIVE_LIB=${nativeLib}/lib \
+                RUST_LIB=${rustLib}/lib \
+                SWIFT_LIB=${swiftLib}/lib
               runHook postInstall
             '';
+            passthru.runtimeDeps = with pkgs; [
+              nodejs-slim
+              litestream
+            ];
+            meta.mainProgram = "main.js";
           };
 
           webApp = pkgs.stdenv.mkDerivation {
@@ -260,72 +303,13 @@
             dontConfigure = true;
             dontBuild = true;
             dontCheck = true;
-            nativeBuildInputs = with pkgs; [
-              git
-              zsh
-              pkg-config
-              cmake
-              ninja
-              python3
-              which
-              clang
-              lld
-              clang-tools
-              rustToolchain
-              bacon
-              wasm-pack
-              wasm-bindgen-cli
-              swift
-              swiftPackages.swiftpm
-              swiftPackages.Dispatch
-              swiftPackages.Foundation
-              nodejs
-              (vscode-with-extensions.override {
-                vscode = vscodium;
-                vscodeExtensions =
-                  with vscode-extensions;
-                  [
-                    docker.docker
-                    bbenoist.nix
-                    streetsidesoftware.code-spell-checker
-                    humao.rest-client
-                    ms-vscode.cmake-tools
-                    esbenp.prettier-vscode
-                    dbaeumer.vscode-eslint
-                    github.github-vscode-theme
-                    christian-kohler.npm-intellisense
-                    wix.vscode-import-cost
-                    bradlc.vscode-tailwindcss
-                    rust-lang.rust-analyzer
-                    llvm-vs-code-extensions.vscode-clangd
-                  ]
-                  ++ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
-                    {
-                      name = "excalidraw-editor";
-                      publisher = "pomdtr";
-                      version = "3.9.1";
-                      sha256 = "sha256-/LqC8GUBEDs+yGYCIX8RQtxDmWogTTiTiF/WJiCuEj4=";
-                    }
-                    {
-                      name = "swift-vscode";
-                      publisher = "swiftlang";
-                      version = "2.16.1";
-                      sha256 = "sha256-xNWflrWVU2KHN/w1vDXGD/+/ctpWdrndFi6aHTEhGao=";
-                    }
-                  ];
-              })
-            ];
-            runtimeDeps = with pkgs; [
-              nodejs-slim
-              litestream
-            ];
-            buildInputs = webApp.runtimeDeps;
+            runtimeDeps = typescriptApp.runtimeDeps;
+            buildInputs = typescriptApp.runtimeDeps;
             installPhase = ''
-              mkdir -p $out/bin $out/lib
-              cp -a ${typescriptApp}/bin/* $out/bin/
-              cp -a ${nativeLib}/lib/* $out/lib/
-              cp -a ${rustLib}/lib/* $out/lib/
-              cp -a ${swiftLib}/lib/* $out/lib/
+              mkdir -p $out
+              cp -a ${typescriptApp}/bin $out/
+              cp -a ${typescriptApp}/lib $out/
+              cp -a ${typescriptApp}/worker $out/
             '';
             meta.mainProgram = "main.js";
           };
@@ -391,6 +375,45 @@
           }
           // rustBins;
           checks = builtins.removeAttrs packages [ "default" ];
+          devShells.default = pkgs.mkShell {
+            packages = devTools ++ [
+              (pkgs.vscode-with-extensions.override {
+                vscode = pkgs.vscodium;
+                vscodeExtensions =
+                  with pkgs.vscode-extensions;
+                  [
+                    docker.docker
+                    bbenoist.nix
+                    streetsidesoftware.code-spell-checker
+                    humao.rest-client
+                    ms-vscode.cmake-tools
+                    esbenp.prettier-vscode
+                    dbaeumer.vscode-eslint
+                    github.github-vscode-theme
+                    christian-kohler.npm-intellisense
+                    wix.vscode-import-cost
+                    bradlc.vscode-tailwindcss
+                    rust-lang.rust-analyzer
+                    llvm-vs-code-extensions.vscode-clangd
+                  ]
+                  ++ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
+                    {
+                      name = "excalidraw-editor";
+                      publisher = "pomdtr";
+                      version = "3.9.1";
+                      sha256 = "sha256-/LqC8GUBEDs+yGYCIX8RQtxDmWogTTiTiF/WJiCuEj4=";
+                    }
+                    {
+                      name = "swift-vscode";
+                      publisher = "swiftlang";
+                      version = "2.16.1";
+                      sha256 = "sha256-xNWflrWVU2KHN/w1vDXGD/+/ctpWdrndFi6aHTEhGao=";
+                    }
+                  ];
+              })
+            ];
+            env.ESBUILD_BINARY_PATH = "${pkgs.esbuild}/bin/esbuild";
+          };
           formatter = pkgs.nixfmt-tree;
         }
       ))

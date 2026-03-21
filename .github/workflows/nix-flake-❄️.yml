@@ -29,7 +29,7 @@ jobs:
         echo "present=false" >> $GITHUB_OUTPUT
       fi
 
-   - uses: DeterminateSystems/flake-checker-action@v0.1.2
+   - uses: DeterminateSystems/flake-checker-action@v12
      with:
        fail-mode: false
 
@@ -71,9 +71,5 @@ jobs:
         skopeo copy \
           "docker-archive:$(readlink -f result)" \
           "docker://${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}" \
-          --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}"
-      nix --extra-experimental-features "flakes nix-command" shell nixpkgs#skopeo -c \
-        skopeo copy \
-          "docker-archive:$(readlink -f result)" \
-          "docker://${REGISTRY}/${IMAGE_NAME}:latest" \
+          --additional-tag "${REGISTRY}/${IMAGE_NAME}:latest" \
           --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}"

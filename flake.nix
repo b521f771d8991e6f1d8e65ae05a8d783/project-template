@@ -236,14 +236,21 @@
           swiftLib = pkgs.swiftPackages.stdenv.mkDerivation {
             name = "swift-lib";
             src = mkSrcWith ./swift;
-            nativeBuildInputs = with pkgs; [
-              swift
-              swiftPackages.swiftpm
-              swiftPackages.Dispatch
-              swiftPackages.Foundation
-              swiftPackages.XCTest
-            ];
-            env.LD_LIBRARY_PATH = "${pkgs.swiftPackages.Dispatch}/lib";
+            nativeBuildInputs =
+              with pkgs;
+              [
+                swift
+                swiftPackages.swiftpm
+              ]
+              # On Darwin, Dispatch/Foundation/XCTest are provided by the Apple SDK
+              ++ lib.optionals pkgs.stdenv.isLinux [
+                swiftPackages.Dispatch
+                swiftPackages.Foundation
+                swiftPackages.XCTest
+              ];
+            env = lib.optionalAttrs pkgs.stdenv.isLinux {
+              LD_LIBRARY_PATH = "${pkgs.swiftPackages.Dispatch}/lib";
+            };
             buildPhase = ''
               export HOME=$TMPDIR
               make build-swift

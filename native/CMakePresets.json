@@ -5,7 +5,7 @@
             "name": "default",
             "generator": "Ninja",
             "environment": {
-                "COMMON_CLFAGS": "-fstack-protector-strong -fstack-clash-protection -Wformat=2 -Wall -pedantic -Werror -D_FORTIFY_SOURCE=3 -D_GLIBCXX_ASSERTIONS -Wl,-z,relro,-z,now -Wformat -Wformat=2 -Wconversion -Wimplicit-fallthrough -Werror=format-security -Wl,-z,nodlopen -Wl,-z,noexecstack -Wl,--as-needed -Wl,--no-copy-dt-needed-entries  -Wno-unused-command-line-argument"
+                "COMMON_CFLAGS": "-fstack-protector-strong -fstack-clash-protection -Wformat=2 -Wall -pedantic -Werror -D_FORTIFY_SOURCE=3 -D_GLIBCXX_ASSERTIONS -Wformat -Wformat=2 -Wconversion -Wimplicit-fallthrough -Werror=format-security -Wno-unused-command-line-argument"
             },
             "cacheVariables": {
                 "CMAKE_EXPORT_COMPILE_COMMANDS": true,
@@ -20,14 +20,10 @@
             }
         },
         {
-            "name": "debug",
+            "name": "linux-base",
             "inherits": "default",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_C_FLAGS": "$env{CMAKE_C_FLAGS} $env{COMMON_CLFAGS} -g -Og  -fsanitize=address,leak,undefined -static-libasan",
-                "CMAKE_CXX_FLAGS": "$env{CMAKE_CXX_FLAGS} $env{COMMON_CLFAGS} -g -Og -fsanitize=address,leak,undefined -static-libasan",
-                "CMAKE_OBJC_FLAGS": "$env{CMAKE_OBJC_FLAGS} $env{COMMON_CLFAGS} -g -Og -Wformat=2 -fsanitize=address,leak,undefined -static-libasan",
-                "CMAKE_OBJCXX_FLAGS": "$env{CMAKE_OBJCXX_FLAGS} $env{COMMON_CLFAGS} -g -Og -Wformat=2 -fsanitize=address,leak,undefined -static-libasan"
+            "environment": {
+                "COMMON_CFLAGS": "-fstack-protector-strong -fstack-clash-protection -Wformat=2 -Wall -pedantic -Werror -D_FORTIFY_SOURCE=3 -D_GLIBCXX_ASSERTIONS -Wl,-z,relro,-z,now -Wformat -Wformat=2 -Wconversion -Wimplicit-fallthrough -Werror=format-security -Wl,-z,nodlopen -Wl,-z,noexecstack -Wl,--as-needed -Wl,--no-copy-dt-needed-entries -Wno-unused-command-line-argument"
             }
         },
         {
@@ -35,10 +31,43 @@
             "inherits": "default",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_C_FLAGS": "$env{CMAKE_C_FLAGS} $env{COMMON_CLFAGS} -O3",
-                "CMAKE_CXX_FLAGS": "$env{CMAKE_CXX_FLAGS} $env{COMMON_CLFAGS} -O3",
-                "CMAKE_OBJC_FLAGS": "$env{CMAKE_OBJC_FLAGS} $env{COMMON_CLFAGS} -O3",
-                "CMAKE_OBJCXX_FLAGS": "$env{CMAKE_OBJCXX_FLAGS} $env{COMMON_CLFAGS} -O3"
+                "CMAKE_C_FLAGS": "$env{CMAKE_C_FLAGS} $env{COMMON_CFLAGS} -O3",
+                "CMAKE_CXX_FLAGS": "$env{CMAKE_CXX_FLAGS} $env{COMMON_CFLAGS} -O3",
+                "CMAKE_OBJC_FLAGS": "$env{CMAKE_OBJC_FLAGS} $env{COMMON_CFLAGS} -O3",
+                "CMAKE_OBJCXX_FLAGS": "$env{CMAKE_OBJCXX_FLAGS} $env{COMMON_CFLAGS} -O3"
+            }
+        },
+        {
+            "name": "debug",
+            "inherits": "default",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_FLAGS": "$env{CMAKE_C_FLAGS} $env{COMMON_CFLAGS} -g -Og",
+                "CMAKE_CXX_FLAGS": "$env{CMAKE_CXX_FLAGS} $env{COMMON_CFLAGS} -g -Og",
+                "CMAKE_OBJC_FLAGS": "$env{CMAKE_OBJC_FLAGS} $env{COMMON_CFLAGS} -g -Og",
+                "CMAKE_OBJCXX_FLAGS": "$env{CMAKE_OBJCXX_FLAGS} $env{COMMON_CFLAGS} -g -Og"
+            }
+        },
+        {
+            "name": "linux-release",
+            "inherits": "linux-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_C_FLAGS": "$env{CMAKE_C_FLAGS} $env{COMMON_CFLAGS} -O3",
+                "CMAKE_CXX_FLAGS": "$env{CMAKE_CXX_FLAGS} $env{COMMON_CFLAGS} -O3",
+                "CMAKE_OBJC_FLAGS": "$env{CMAKE_OBJC_FLAGS} $env{COMMON_CFLAGS} -O3",
+                "CMAKE_OBJCXX_FLAGS": "$env{CMAKE_OBJCXX_FLAGS} $env{COMMON_CFLAGS} -O3"
+            }
+        },
+        {
+            "name": "linux-debug",
+            "inherits": "linux-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_FLAGS": "$env{CMAKE_C_FLAGS} $env{COMMON_CFLAGS} -g -Og -fsanitize=address,leak,undefined -static-libasan",
+                "CMAKE_CXX_FLAGS": "$env{CMAKE_CXX_FLAGS} $env{COMMON_CFLAGS} -g -Og -fsanitize=address,leak,undefined -static-libasan",
+                "CMAKE_OBJC_FLAGS": "$env{CMAKE_OBJC_FLAGS} $env{COMMON_CFLAGS} -g -Og -fsanitize=address,leak,undefined -static-libasan",
+                "CMAKE_OBJCXX_FLAGS": "$env{CMAKE_OBJCXX_FLAGS} $env{COMMON_CFLAGS} -g -Og -fsanitize=address,leak,undefined -static-libasan"
             }
         }
     ]

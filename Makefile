@@ -28,6 +28,15 @@ NATIVE_CMAKE_FLAGS := \
 	$(if $(OBJC_CFLAGS),-DCMAKE_OBJC_FLAGS="$(OBJC_CFLAGS)",) \
 	$(if $(OBJC_LIB_DIR),-DCMAKE_LIBRARY_PATH="$(OBJC_LIB_DIR)",)
 
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Linux)
+  NATIVE_RELEASE_PRESET := linux-release
+  NATIVE_DEBUG_PRESET   := linux-debug
+else
+  NATIVE_RELEASE_PRESET := release
+  NATIVE_DEBUG_PRESET   := debug
+endif
+
 .PHONY: dev release debug test clean wasm format
 
 # ── Development ────────────────────────────────────────────────────
@@ -60,11 +69,11 @@ debug:
 .PHONY: build-native build-native-debug test-native clean-native
 
 build-native:
-	cd native && PROJECT_NAME=native-lib cmake -G Ninja -S . -B build --preset release $(NATIVE_CMAKE_FLAGS)
+	cd native && PROJECT_NAME=native-lib cmake -G Ninja -S . -B build --preset $(NATIVE_RELEASE_PRESET) $(NATIVE_CMAKE_FLAGS)
 	cd native && cmake --build build
 
 build-native-debug:
-	cd native && PROJECT_NAME=native-lib cmake -G Ninja -S . -B build --preset debug $(NATIVE_CMAKE_FLAGS)
+	cd native && PROJECT_NAME=native-lib cmake -G Ninja -S . -B build --preset $(NATIVE_DEBUG_PRESET) $(NATIVE_CMAKE_FLAGS)
 	cd native && cmake --build build
 
 test-native:

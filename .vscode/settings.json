@@ -20,5 +20,6 @@
       "cmake.generator": "Ninja",
       "json.schemaDownload.trustedDomains": {
             "https://cdn.jsdelivr.net": true
-      }
+      },
+      "makefile.configureOnOpen": false
 }

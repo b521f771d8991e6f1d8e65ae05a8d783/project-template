@@ -2,6 +2,10 @@
     "image": "ghcr.io/b521f771d8991e6f1d8e65ae05a8d783/base-tools/debian-tools-2:main",
     "containerUser": "vscode",
     "remoteUser": "vscode",
+    "remoteEnv": {
+        "SHELL": "/bin/zsh",
+        "PROMPT": "%F{cyan}%n@%m%f:%F{yellow}%~%f %# "
+    },
     "customizations": {
         "vscode": {
             "extensions": [

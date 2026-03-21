@@ -433,11 +433,11 @@
           formatter = pkgs.nixfmt-tree;
         }
       ))
-      # WASM packages — platform-independent, built from first supported system
+      # WASM packages — platform-independent, built from the current host system
       {
         packages.wasm32-unknown-unknown =
           let
-            pkgs = mkPkgs (builtins.head supportedSystems);
+            pkgs = mkPkgs builtins.currentSystem;
           in
           mkWasmBins pkgs
           // {

@@ -1,0 +1,24 @@
+{
+    "image": "ghcr.io/b521f771d8991e6f1d8e65ae05a8d783/base-tools/debian-tools-2:main",
+    "containerUser": "vscode",
+    "remoteUser": "vscode",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "vscjava.vscode-java-pack",
+                "vmware.vscode-spring-boot",
+                "ms-azuretools.vscode-docker",
+                "humao.rest-client",
+                "anthropic.claude-code",
+                "llvm-vs-code-extensions.vscode-clangd",
+                "bbenoist.nix",
+                "ms-python.python",
+                "swiftlang.swift-vscode",
+                "rust-lang.rust-analyzer",
+                "twxs.cmake",
+                "ms-vscode.cmake-tools",
+                "ms-vscode.makefile-tools"
+            ]
+        }
+    }
+}

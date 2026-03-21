@@ -150,29 +150,32 @@
           wasmPkg = mkWasmPkg pkgs;
 
           # ── Shared toolchains (devShell + webApp) ──────────────────
-          devTools = with pkgs; [
-            git
-            zsh
-            pkg-config
-            cmake
-            ninja
-            python3
-            which
-            clang
-            lld
-            clang-tools
-            gnustep-libobjc
-            esbuild
-            rustToolchain
-            bacon
-            wasm-pack
-            wasm-bindgen-cli
-            swift
-            swiftPackages.swiftpm
-            swiftPackages.Dispatch
-            swiftPackages.Foundation
-            nodejs
-          ];
+          devTools =
+            with pkgs;
+            [
+              git
+              zsh
+              pkg-config
+              cmake
+              ninja
+              python3
+              which
+              clang
+              lld
+              clang-tools
+              esbuild
+              rustToolchain
+              bacon
+              wasm-pack
+              wasm-bindgen-cli
+              swift
+              swiftPackages.swiftpm
+              swiftPackages.Dispatch
+              swiftPackages.Foundation
+              nodejs
+            ]
+            ++ lib.optionals pkgs.stdenv.isLinux [ gnustep-libobjc ]
+            ++ lib.optionals pkgs.stdenv.isDarwin [ apple-sdk ];
 
           rustBins = builtins.listToAttrs (
             map (binName: {
@@ -197,12 +200,15 @@
           nativeLib = pkgs.clangStdenv.mkDerivation {
             name = "native-lib";
             src = mkSrcWith ./native;
-            nativeBuildInputs = with pkgs; [
-              cmake
-              ninja
-              lld
-              gnustep-libobjc
-            ];
+            nativeBuildInputs =
+              with pkgs;
+              [
+                cmake
+                ninja
+                lld
+              ]
+              ++ lib.optionals pkgs.stdenv.isLinux [ gnustep-libobjc ]
+              ++ lib.optionals pkgs.stdenv.isDarwin [ apple-sdk ];
             env.PROJECT_NAME = "native-lib";
             configurePhase = "true";
             buildPhase = "make build-native";
@@ -369,11 +375,14 @@
                 cp -r ${typescriptApp}/worker/assets $out/
               '';
             };
-            docker-image = buildImage webApp;
-            "docker-image-debug" = buildImage webAppDebug;
             default = webApp;
           }
-          // rustBins;
+          // rustBins
+          # busybox (used in docker images) is Linux-only
+          // lib.optionalAttrs pkgs.stdenv.isLinux {
+            "docker-image" = buildImage webApp;
+            "docker-image-debug" = buildImage webAppDebug;
+          };
           checks = builtins.removeAttrs packages [ "default" ];
           devShells.default = pkgs.mkShell {
             packages = devTools ++ [

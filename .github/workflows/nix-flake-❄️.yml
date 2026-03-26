@@ -49,7 +49,7 @@ jobs:
       nix --extra-experimental-features "flakes nix-command" copy --no-check-sigs \
         .#web-app .#web-app-debug \
         .#native-lib .#rust-lib .#swift-lib .#typescript-app \
-        .#packages.wasm32-unknown-unknown.wasm-pkg \
+        .#wasm-pkg \
         --to ${{ runner.temp }}/result
       if [ "$(uname)" = "Linux" ]; then
         nix --extra-experimental-features "flakes nix-command" copy --no-check-sigs \

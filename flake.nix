@@ -1,11 +1,10 @@
 # for good documentation, see here: https://nixos.org/manual/nixpkgs/stable/
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-25.11";
     flake-utils.url = "github:numtide/flake-utils";
     rust-overlay.url = "github:oxalica/rust-overlay";
     rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
-    self.submodules = true;
   };
 
   outputs =
@@ -333,34 +332,88 @@
 
           buildImage =
             pkg:
-            pkgs.dockerTools.buildLayeredImage (
-              let
-                port = "8081";
-              in
-              {
-                name = pkg.name;
-                contents = pkg.runtimeDeps ++ [ pkgs.busybox ];
-                config = {
-                  Cmd = [ "${pkg}/bin/${pkg.meta.mainProgram}" ];
-                  User = "65534:65534";
-                  WorkingDir = "/app";
-                  Env = [ "BACKEND_LISTEN_PORT=${port}" ];
-                  ExposedPorts.${port} = { };
-                  Healthcheck = {
-                    Test = [
-                      "${pkgs.curlMinimal}/bin/curl"
-                      "-f"
-                      "-s"
-                      "localhost:${port}/api/status"
-                    ];
-                    Interval = 30000000000;
-                    Timeout = 10000000000;
-                    Retries = 3;
-                  };
-                  Volumes."/app" = { };
+            let
+              port = "8081";
+
+              litestreamConfig = pkgs.writeTextDir "etc/litestream.yml" ''
+                dbs:
+                  - path: /app/data.db
+                    replicas:
+                      - url: $LITESTREAM_URL
+              '';
+
+              systemdUnits = pkgs.runCommand "systemd-units" { } ''
+                mkdir -p $out/etc/systemd/system/multi-user.target.wants
+
+                cat > $out/etc/systemd/system/node-server.service <<'EOF'
+                [Unit]
+                Description=Node.js Express Server
+
+                [Service]
+                Type=simple
+                ExecStart=${pkgs.nodejs-slim}/bin/node ${pkg}/bin/${pkg.meta.mainProgram}
+                WorkingDirectory=/app
+                PassEnvironment=BACKEND_LISTEN_PORT BACKEND_LISTEN_HOSTNAME DISABLE_CLUSTER
+                Restart=always
+                RestartSec=3
+
+                [Install]
+                WantedBy=multi-user.target
+                EOF
+
+                cat > $out/etc/systemd/system/litestream.service <<'EOF'
+                [Unit]
+                Description=Litestream SQLite Replication
+                After=node-server.service
+                ConditionEnvironment=LITESTREAM_URL
+
+                [Service]
+                Type=simple
+                ExecStartPre=${pkgs.busybox}/bin/sh -c 'until [ -f /app/data.db ]; do sleep 1; done'
+                ExecStart=${pkgs.litestream}/bin/litestream replicate -config /etc/litestream.yml
+                WorkingDirectory=/app
+                PassEnvironment=LITESTREAM_URL
+                Restart=always
+                RestartSec=5
+
+                [Install]
+                WantedBy=multi-user.target
+                EOF
+
+                ln -s ../node-server.service $out/etc/systemd/system/multi-user.target.wants/
+                ln -s ../litestream.service $out/etc/systemd/system/multi-user.target.wants/
+              '';
+            in
+            pkgs.dockerTools.buildLayeredImage {
+              name = pkg.name;
+              contents = pkg.runtimeDeps ++ [
+                pkgs.busybox
+                pkgs.systemd
+                litestreamConfig
+                systemdUnits
+              ];
+              config = {
+                Cmd = [ "${pkgs.systemd}/lib/systemd/systemd" ];
+                WorkingDir = "/app";
+                Env = [
+                  "BACKEND_LISTEN_PORT=${port}"
+                  "BACKEND_LISTEN_HOSTNAME=0.0.0.0"
+                ];
+                ExposedPorts.${port} = { };
+                Healthcheck = {
+                  Test = [
+                    "${pkgs.curlMinimal}/bin/curl"
+                    "-f"
+                    "-s"
+                    "localhost:${port}/api/status"
+                  ];
+                  Interval = 30000000000;
+                  Timeout = 10000000000;
+                  Retries = 3;
                 };
-              }
-            );
+                Volumes."/app" = { };
+              };
+            };
         in
         rec {
           packages = {

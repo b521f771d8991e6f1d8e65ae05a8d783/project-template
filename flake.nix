@@ -5,7 +5,7 @@
 {
   # ── Flake inputs (pinned dependency sources) ────────────────────────
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/release-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     flake-utils.url = "github:numtide/flake-utils"; # helpers for multi-system boilerplate
     rust-overlay.url = "github:oxalica/rust-overlay"; # provides specific Rust toolchains via overlay
     rust-overlay.inputs.nixpkgs.follows = "nixpkgs"; # ensure rust-overlay uses our pinned nixpkgs

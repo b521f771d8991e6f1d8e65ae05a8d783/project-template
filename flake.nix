@@ -169,10 +169,7 @@
         );
     in
     # ── Per-system outputs ──────────────────────────────────────────
-    # recursiveUpdate merges the per-system outputs (packages, checks,
-    # devShells) with the platform-independent WASM outputs at the bottom.
-    lib.recursiveUpdate
-      (flake-utils.lib.eachSystem supportedSystems (
+    flake-utils.lib.eachSystem supportedSystems (
         system:
         let
           pkgs = mkPkgs system;
@@ -490,6 +487,9 @@
             default = webApp;
           }
           // rustBins # merge in native Rust binary packages (rust-<name>)
+          # WASM packages — platform-independent output built using this system's toolchain
+          // { "wasm-pkg" = mkWasmPkg pkgs; }
+          // (mkWasmBins pkgs)
           # Docker images require busybox + systemd, which are Linux-only
           // lib.optionalAttrs pkgs.stdenv.isLinux {
             "docker-image" = buildImage webApp;
@@ -544,21 +544,5 @@
           };
           formatter = pkgs.nixfmt-tree; # `nix fmt` uses nixfmt-tree
         }
-      ))
-      # ── WASM outputs (platform-independent) ──────────────────────
-      # These are exposed under the virtual system "wasm32-unknown-unknown"
-      # and built using the current host's toolchain. Includes:
-      #   - wasm-pkg  (browser WASM via wasm-bindgen, the default)
-      #   - one WASI binary per discovered Rust bin target
-      {
-        packages.wasm32-unknown-unknown =
-          let
-            pkgs = mkPkgs builtins.currentSystem;
-          in
-          mkWasmBins pkgs
-          // {
-            "wasm-pkg" = mkWasmPkg pkgs;
-            default = mkWasmPkg pkgs;
-          };
-      };
+      );
 }

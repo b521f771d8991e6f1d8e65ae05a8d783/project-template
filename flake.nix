@@ -1,10 +1,14 @@
-# for good documentation, see here: https://nixos.org/manual/nixpkgs/stable/
+# Project template flake — multi-language monorepo (Rust, TypeScript, Swift, C/C++)
+# that produces native binaries, WASM modules, a web app, and Docker images.
+#
+# Nix reference: https://nixos.org/manual/nixpkgs/stable/
 {
+  # ── Flake inputs (pinned dependency sources) ────────────────────────
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/release-25.11";
-    flake-utils.url = "github:numtide/flake-utils";
-    rust-overlay.url = "github:oxalica/rust-overlay";
-    rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
+    flake-utils.url = "github:numtide/flake-utils"; # helpers for multi-system boilerplate
+    rust-overlay.url = "github:oxalica/rust-overlay"; # provides specific Rust toolchains via overlay
+    rust-overlay.inputs.nixpkgs.follows = "nixpkgs"; # ensure rust-overlay uses our pinned nixpkgs
   };
 
   outputs =
@@ -23,12 +27,23 @@
         aarch64-darwin
       ];
 
+      # ── Rust binary discovery ─────────────────────────────────────
+      # Automatically discovers all Rust binary targets so we don't
+      # have to maintain a manual list. Mirrors Cargo's own discovery:
+      #   1. Explicit [[bin]] entries in Cargo.toml
+      #   2. src/main.rs  (uses the package name)
+      #   3. src/bin/*.rs  and  src/bin/*/main.rs
       cargoToml = builtins.fromTOML (builtins.readFile ./rust/Cargo.toml);
       rustBinNames =
         let
+          # [[bin]] entries declared explicitly in Cargo.toml
           explicit = if cargoToml ? bin then map (b: b.name) cargoToml.bin else [ ];
+          # Default binary from src/main.rs (named after the package)
           main = if builtins.pathExists ./rust/src/main.rs then [ cargoToml.package.name ] else [ ];
           binDir = ./rust/src/bin;
+          # Auto-discovered binaries from the src/bin/ directory:
+          #   - single-file binaries: src/bin/foo.rs
+          #   - directory binaries:   src/bin/foo/main.rs
           auto =
             if builtins.pathExists binDir then
               let
@@ -46,6 +61,9 @@
         in
         lib.unique (explicit ++ main ++ auto);
 
+      # ── Helper functions ────────────────────────────────────────
+
+      # Instantiate nixpkgs for a given system with the Rust overlay applied.
       mkPkgs =
         system:
         import nixpkgs {
@@ -54,15 +72,17 @@
           config.allowUnfree = false;
         };
 
+      # Stable Rust toolchain with additional WASM compilation targets.
       mkRustToolchain =
         pkgs:
         pkgs.rust-bin.stable.latest.default.override {
           targets = [
-            "wasm32-unknown-unknown"
-            "wasm32-wasip1"
+            "wasm32-unknown-unknown" # browser WASM (no system interface)
+            "wasm32-wasip1" # WASI preview 1 (runs in wasmtime)
           ];
         };
 
+      # Build a Rust platform (cargo + rustc pair) using our chosen toolchain.
       mkRustPlatform =
         pkgs:
         let
@@ -73,6 +93,9 @@
           rustc = rt;
         };
 
+      # Create a minimal source tree containing only the Makefile and one
+      # subdirectory. This keeps Nix store inputs small and avoids unnecessary
+      # rebuilds when unrelated files change.
       mkSrcWith =
         dir:
         lib.fileset.toSource {
@@ -83,6 +106,9 @@
           ];
         };
 
+      # Build the Rust crate as a browser-targeted WASM package using
+      # wasm-bindgen. The output (JS glue + .wasm) is consumed by the
+      # TypeScript/web app build.
       mkWasmPkg =
         pkgs:
         (mkRustPlatform pkgs).buildRustPackage {
@@ -106,6 +132,9 @@
           '';
         };
 
+      # Build each discovered Rust binary as a WASI module and wrap it with
+      # wasmtime so it can be executed like a normal CLI program.
+      # Produces one derivation per binary in rustBinNames.
       mkWasmBins =
         pkgs:
         let
@@ -139,6 +168,9 @@
           }) rustBinNames
         );
     in
+    # ── Per-system outputs ──────────────────────────────────────────
+    # recursiveUpdate merges the per-system outputs (packages, checks,
+    # devShells) with the platform-independent WASM outputs at the bottom.
     lib.recursiveUpdate
       (flake-utils.lib.eachSystem supportedSystems (
         system:
@@ -148,7 +180,7 @@
           rustPlatform = mkRustPlatform pkgs;
           wasmPkg = mkWasmPkg pkgs;
 
-          # ── Shared toolchains (devShell + webApp) ──────────────────
+          # ── Development tools (shared by devShell and builds) ──────
           devTools =
             with pkgs;
             [
@@ -176,6 +208,9 @@
             ++ lib.optionals pkgs.stdenv.isLinux [ gnustep-libobjc ]
             ++ lib.optionals pkgs.stdenv.isDarwin [ apple-sdk ];
 
+          # ── Package derivations ───────────────────────────────────
+
+          # Native Rust binaries (one per discovered bin target, prefixed "rust-")
           rustBins = builtins.listToAttrs (
             map (binName: {
               name = "rust-${binName}";
@@ -196,6 +231,7 @@
             }) rustBinNames
           );
 
+          # C/C++/Objective-C shared library built with clang + CMake/Ninja
           nativeLib = pkgs.clangStdenv.mkDerivation {
             name = "native-lib";
             src = mkSrcWith ./native;
@@ -219,6 +255,7 @@
             '';
           };
 
+          # Rust library crate (produces .rlib / .so / .dylib)
           rustLib = rustPlatform.buildRustPackage {
             pname = "rust-lib";
             version = "0.1.0";
@@ -232,6 +269,7 @@
             '';
           };
 
+          # Swift library (compiled modules + object files)
           swiftLib = pkgs.swiftPackages.stdenv.mkDerivation {
             name = "swift-lib";
             src = mkSrcWith ./swift;
@@ -266,6 +304,10 @@
             '';
           };
 
+          # TypeScript web application — bundles the WASM package, native lib,
+          # Rust lib, and Swift lib into a deployable artifact with:
+          #   - Expo static export + Node.js server (bin/main.js)
+          #   - Cloudflare Worker bundle (worker/worker.js)
           typescriptApp = pkgs.buildNpmPackage {
             pname = "typescript-app";
             version = "0.0.0";
@@ -309,6 +351,8 @@
             meta.mainProgram = "main.js";
           };
 
+          # Thin wrapper around typescriptApp that copies the final artifacts
+          # into a clean output (bin/, lib/, worker/) for deployment.
           webApp = pkgs.stdenv.mkDerivation {
             name = "web-app";
             dontUnpack = true;
@@ -326,10 +370,16 @@
             meta.mainProgram = "main.js";
           };
 
+          # Debug variant (same build, different name for identification)
           webAppDebug = webApp.overrideAttrs (_: {
             name = "web-app-debug";
           });
 
+          # ── Docker image builder ──────────────────────────────────
+          # Creates a layered OCI image with two systemd services:
+          #   1. node-server  — the Node.js Express backend
+          #   2. litestream   — SQLite replication (only starts if LITESTREAM_URL is set)
+          # The image uses systemd as PID 1 to manage both services.
           buildImage =
             pkg:
             let
@@ -416,6 +466,8 @@
             };
         in
         rec {
+          # ── Exported packages ──────────────────────────────────────
+          # Build with: nix build .#<name>   (e.g. nix build .#web-app)
           packages = {
             "web-app" = webApp;
             "web-app-debug" = webAppDebug;
@@ -437,13 +489,20 @@
             };
             default = webApp;
           }
-          // rustBins
-          # busybox (used in docker images) is Linux-only
+          // rustBins # merge in native Rust binary packages (rust-<name>)
+          # Docker images require busybox + systemd, which are Linux-only
           // lib.optionalAttrs pkgs.stdenv.isLinux {
             "docker-image" = buildImage webApp;
             "docker-image-debug" = buildImage webAppDebug;
           };
+          # `nix flake check` builds every package except "default" (which
+          # is an alias and would duplicate work).
           checks = builtins.removeAttrs packages [ "default" ];
+
+          # ── Development shell ──────────────────────────────────────
+          # Enter with: nix develop
+          # Provides all compilers, tools, and a VSCodium instance with
+          # pre-configured extensions for the full polyglot stack.
           devShells.default = pkgs.mkShell {
             packages = devTools ++ [
               (pkgs.vscode-with-extensions.override {
@@ -483,10 +542,14 @@
             ];
             env.ESBUILD_BINARY_PATH = "${pkgs.esbuild}/bin/esbuild";
           };
-          formatter = pkgs.nixfmt-tree;
+          formatter = pkgs.nixfmt-tree; # `nix fmt` uses nixfmt-tree
         }
       ))
-      # WASM packages — platform-independent, built from the current host system
+      # ── WASM outputs (platform-independent) ──────────────────────
+      # These are exposed under the virtual system "wasm32-unknown-unknown"
+      # and built using the current host's toolchain. Includes:
+      #   - wasm-pkg  (browser WASM via wasm-bindgen, the default)
+      #   - one WASI binary per discovered Rust bin target
       {
         packages.wasm32-unknown-unknown =
           let

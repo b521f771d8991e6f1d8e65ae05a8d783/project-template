@@ -13,6 +13,11 @@ let package = Package(
         .target(
             name: "project-template",
             path: "Sources/project-template"),
+        .executableTarget(
+            name: "hello",
+            dependencies: ["project-template"],
+            path: "Sources/hello",
+            resources: [.process("Resources")]),
         .testTarget(
             name: "project-templateTests",
             dependencies: ["project-template"],

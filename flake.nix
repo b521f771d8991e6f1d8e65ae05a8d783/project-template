@@ -259,6 +259,7 @@
                   [
                     swift
                     swiftPackages.swiftpm
+                    makeWrapper
                   ]
                   ++ lib.optionals pkgs.stdenv.isLinux [
                     swiftPackages.Dispatch
@@ -275,7 +276,13 @@
                   runHook preInstall
                   mkdir -p $out/bin
                   buildDir=$(swift build -c release --show-bin-path)
-                  cp "$buildDir/${binName}" $out/bin/
+                  cp "$buildDir/${binName}" $out/bin/.${binName}-wrapped
+                  # Copy any Swift resource bundles alongside the binary
+                  for bundle in "$buildDir"/*.resources; do
+                    [ -e "$bundle" ] && cp -r "$bundle" $out/bin/
+                  done
+                  makeWrapper $out/bin/.${binName}-wrapped $out/bin/${binName} \
+                    ${lib.optionalString pkgs.stdenv.isLinux "--set LD_LIBRARY_PATH ${pkgs.swiftPackages.Dispatch}/lib"}
                   runHook postInstall
                 '';
                 meta.mainProgram = binName;

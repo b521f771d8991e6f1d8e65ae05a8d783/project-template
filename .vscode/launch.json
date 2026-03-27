@@ -1,0 +1,15 @@
+{
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Dev Server (make dev)",
+      "runtimeExecutable": "make",
+      "runtimeArgs": [
+        "dev"
+      ],
+      "cwd": "${workspaceFolder:project-template}",
+      "console": "integratedTerminal"
+    },
+  ]
+}

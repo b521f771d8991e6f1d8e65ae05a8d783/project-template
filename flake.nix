@@ -33,6 +33,24 @@
       #   1. Explicit [[bin]] entries in Cargo.toml
       #   2. src/main.rs  (uses the package name)
       #   3. src/bin/*.rs  and  src/bin/*/main.rs
+      # ── Swift binary discovery ─────────────────────────────────
+      # Automatically discovers Swift executable targets by scanning
+      # for Sources/*/main.swift (the Swift convention for executables).
+      swiftBinNames =
+        let
+          srcDir = ./swift/Sources;
+        in
+        if builtins.pathExists srcDir then
+          let
+            entries = builtins.readDir srcDir;
+            names = builtins.attrNames entries;
+          in
+          builtins.filter (
+            n: entries.${n} == "directory" && builtins.pathExists (srcDir + "/${n}/main.swift")
+          ) names
+        else
+          [ ];
+
       cargoToml = builtins.fromTOML (builtins.readFile ./rust/Cargo.toml);
       rustBinNames =
         let
@@ -226,6 +244,43 @@
                 ];
               };
             }) rustBinNames
+          );
+
+          # Native Swift binaries (one per discovered executable target, prefixed "swift-")
+          swiftBins = builtins.listToAttrs (
+            map (binName: {
+              name = "swift-${binName}";
+              value = pkgs.swiftPackages.stdenv.mkDerivation {
+                pname = binName;
+                version = "0.1.0";
+                src = mkSrcWith ./swift;
+                nativeBuildInputs =
+                  with pkgs;
+                  [
+                    swift
+                    swiftPackages.swiftpm
+                  ]
+                  ++ lib.optionals pkgs.stdenv.isLinux [
+                    swiftPackages.Dispatch
+                    swiftPackages.Foundation
+                  ];
+                env = lib.optionalAttrs pkgs.stdenv.isLinux {
+                  LD_LIBRARY_PATH = "${pkgs.swiftPackages.Dispatch}/lib";
+                };
+                buildPhase = ''
+                  export HOME=$TMPDIR
+                  cd swift && swift build -c release --product ${binName}
+                '';
+                installPhase = ''
+                  runHook preInstall
+                  mkdir -p $out/bin
+                  buildDir=$(swift build -c release --show-bin-path)
+                  cp "$buildDir/${binName}" $out/bin/
+                  runHook postInstall
+                '';
+                meta.mainProgram = binName;
+              };
+            }) swiftBinNames
           );
 
           # C/C++/Objective-C shared library built with clang + CMake/Ninja
@@ -487,6 +542,7 @@
             default = webApp;
           }
           // rustBins # merge in native Rust binary packages (rust-<name>)
+          // swiftBins # merge in native Swift binary packages (swift-<name>)
           # WASM packages — platform-independent output built using this system's toolchain
           // { "wasm-pkg" = mkWasmPkg pkgs; }
           // (mkWasmBins pkgs)

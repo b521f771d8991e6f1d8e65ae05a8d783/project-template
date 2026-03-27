@@ -14,10 +14,13 @@ ifeq ($(OBJC_LINK_FLAGS),)
   endif
 endif
 
-# Swift runtime (libdispatch on Linux)
+# Swift runtime (libdispatch on Linux — only needed inside a Nix dev shell
+# where Swift itself comes from Nix; the system Swift ships its own libdispatch)
+ifdef IN_NIX_SHELL
 _LIBDISPATCH_SO := $(wildcard /nix/store/*-swift-corelibs-libdispatch-*/lib/libdispatch.so)
 ifneq ($(_LIBDISPATCH_SO),)
   SWIFT_LD_LIBRARY_PATH := $(dir $(lastword $(_LIBDISPATCH_SO)))
+endif
 endif
 
 NATIVE_CMAKE_FLAGS := \
@@ -114,9 +117,14 @@ clean-typescript:
 # ── WASM ───────────────────────────────────────────────────────────
 
 wasm:
-	cd rust && cargo build --target wasm32-unknown-unknown --release
-	cd rust && wasm-bindgen --target web --out-dir target/npm-pkg \
-		target/wasm32-unknown-unknown/release/rust.wasm
+	@if echo 'fn main(){}' | rustc --target wasm32-unknown-unknown - -o /dev/null 2>/dev/null; then \
+		cd rust && cargo build --target wasm32-unknown-unknown --release && \
+		wasm-bindgen --target web --out-dir target/npm-pkg \
+			target/wasm32-unknown-unknown/release/rust.wasm; \
+	else \
+		echo "Skipping WASM build (wasm32-unknown-unknown target not available -- use nix develop)"; \
+		mkdir -p rust/target/npm-pkg; \
+	fi
 
 DIST       ?= dist
 TS_DIST    ?= typescript/dist

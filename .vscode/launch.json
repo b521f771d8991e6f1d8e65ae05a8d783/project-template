@@ -8,8 +8,28 @@
       "runtimeArgs": [
         "dev"
       ],
-      "cwd": "${workspaceFolder:project-template}",
+      "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
     },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder}/swift",
+      "name": "Debug hello (swift)",
+      "target": "hello",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug hello (swift)"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder}/swift",
+      "name": "Release hello (swift)",
+      "target": "hello",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release hello (swift)"
+    }
   ]
 }

@@ -567,42 +567,7 @@
           # Provides all compilers, tools, and a VSCodium instance with
           # pre-configured extensions for the full polyglot stack.
           devShells.default = pkgs.mkShell {
-            packages = devTools ++ [
-              (pkgs.vscode-with-extensions.override {
-                vscode = pkgs.vscodium;
-                vscodeExtensions =
-                  with pkgs.vscode-extensions;
-                  [
-                    docker.docker
-                    bbenoist.nix
-                    streetsidesoftware.code-spell-checker
-                    humao.rest-client
-                    ms-vscode.cmake-tools
-                    esbenp.prettier-vscode
-                    dbaeumer.vscode-eslint
-                    github.github-vscode-theme
-                    christian-kohler.npm-intellisense
-                    wix.vscode-import-cost
-                    bradlc.vscode-tailwindcss
-                    rust-lang.rust-analyzer
-                    llvm-vs-code-extensions.vscode-clangd
-                  ]
-                  ++ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
-                    {
-                      name = "excalidraw-editor";
-                      publisher = "pomdtr";
-                      version = "3.9.1";
-                      sha256 = "sha256-/LqC8GUBEDs+yGYCIX8RQtxDmWogTTiTiF/WJiCuEj4=";
-                    }
-                    {
-                      name = "swift-vscode";
-                      publisher = "swiftlang";
-                      version = "2.16.1";
-                      sha256 = "sha256-xNWflrWVU2KHN/w1vDXGD/+/ctpWdrndFi6aHTEhGao=";
-                    }
-                  ];
-              })
-            ];
+            packages = devTools;
             env.ESBUILD_BINARY_PATH = "${pkgs.esbuild}/bin/esbuild";
           };
           formatter = pkgs.nixfmt-tree; # `nix fmt` uses nixfmt-tree

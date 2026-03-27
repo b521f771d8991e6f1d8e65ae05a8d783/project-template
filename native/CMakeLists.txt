@@ -9,7 +9,8 @@ add_library(core SHARED
     test.m
     test.mm
 )
-find_library(OBJC_LIBRARY objc)
+find_library(OBJC_LIBRARY objc
+    HINTS ${CMAKE_C_IMPLICIT_LINK_DIRECTORIES})
 target_link_libraries(core PUBLIC ${OBJC_LIBRARY})
 
 enable_testing()

@@ -64,10 +64,10 @@
             "inherits": "linux-base",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_C_FLAGS": "$env{CMAKE_C_FLAGS} $env{COMMON_CFLAGS} -g -Og -fsanitize=address,leak,undefined -static-libasan",
-                "CMAKE_CXX_FLAGS": "$env{CMAKE_CXX_FLAGS} $env{COMMON_CFLAGS} -g -Og -fsanitize=address,leak,undefined -static-libasan",
-                "CMAKE_OBJC_FLAGS": "$env{CMAKE_OBJC_FLAGS} $env{COMMON_CFLAGS} -g -Og -fsanitize=address,leak,undefined -static-libasan",
-                "CMAKE_OBJCXX_FLAGS": "$env{CMAKE_OBJCXX_FLAGS} $env{COMMON_CFLAGS} -g -Og -fsanitize=address,leak,undefined -static-libasan"
+                "CMAKE_C_FLAGS": "$env{CMAKE_C_FLAGS} $env{COMMON_CFLAGS} -g -Og",
+                "CMAKE_CXX_FLAGS": "$env{CMAKE_CXX_FLAGS} $env{COMMON_CFLAGS} -g -Og",
+                "CMAKE_OBJC_FLAGS": "$env{CMAKE_OBJC_FLAGS} $env{COMMON_CFLAGS} -g -Og",
+                "CMAKE_OBJCXX_FLAGS": "$env{CMAKE_OBJCXX_FLAGS} $env{COMMON_CFLAGS} -g -Og"
             }
         }
     ]

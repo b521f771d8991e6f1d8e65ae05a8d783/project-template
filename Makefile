@@ -45,9 +45,9 @@ endif
 # ── Development ────────────────────────────────────────────────────
 
 dev:
-	$(MAKE) build-native
-	$(MAKE) build-rust
-	$(MAKE) build-swift
+	$(MAKE) build-native-debug
+	$(MAKE) build-rust-debug
+	$(MAKE) build-swift-debug
 	$(MAKE) wasm
 	cd typescript && npm start
 

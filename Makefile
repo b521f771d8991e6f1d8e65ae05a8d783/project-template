@@ -37,7 +37,7 @@ else
   NATIVE_DEBUG_PRESET   := debug
 endif
 
-.PHONY: dev release debug test clean wasm format
+.PHONY: dev test clean wasm format
 
 # ── Development ────────────────────────────────────────────────────
 
@@ -47,22 +47,6 @@ dev:
 	$(MAKE) build-swift
 	$(MAKE) wasm
 	cd typescript && npm start
-
-# ── Full builds ────────────────────────────────────────────────────
-
-release:
-	$(MAKE) build-native
-	$(MAKE) build-rust
-	$(MAKE) build-swift
-	$(MAKE) wasm
-	$(MAKE) build-typescript
-
-debug:
-	$(MAKE) build-native-debug
-	$(MAKE) build-rust-debug
-	$(MAKE) build-swift-debug
-	$(MAKE) wasm
-	$(MAKE) build-typescript
 
 # ── Native (C/C++) ─────────────────────────────────────────────────
 
@@ -145,7 +129,6 @@ SWIFT_LIB  ?= $$(cd swift && swift build -c release --show-bin-path)
 .PHONY: install dist
 
 dist:
-	$(MAKE) release
 	$(MAKE) install
 
 install:

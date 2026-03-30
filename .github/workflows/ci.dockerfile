@@ -9,7 +9,6 @@ RUN --mount=type=cache,target=/build/native/build \
   --mount=type=cache,target=/build/rust/target \
   --mount=type=cache,target=~/.cargo \
   --mount=type=cache,target=~/.swiftpm \
-  --mount=type=cache,target=/build/typescript/dist \
   --mount=type=cache,target=/build/typescript/.expo \
   --mount=type=cache,target=/tmp/metro-cache \
   make

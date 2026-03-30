@@ -1,5 +1,5 @@
 # ── Toolchain ─────────────────────────────────────────────────────
-SHELL=/usr/bin/env zsh
+SHELL := $(shell command -v zsh)
 
 CC  := $(shell command -v clang)
 CXX := $(shell command -v clang++)

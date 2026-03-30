@@ -40,7 +40,11 @@ else
   NATIVE_DEBUG_PRESET   := debug
 endif
 
-.PHONY: dev test clean wasm format
+.PHONY: all dev test clean wasm format
+
+# ── Default (build everything) ────────────────────────────────────
+
+all: build-native build-rust build-swift build-typescript wasm
 
 # ── Development ────────────────────────────────────────────────────
 

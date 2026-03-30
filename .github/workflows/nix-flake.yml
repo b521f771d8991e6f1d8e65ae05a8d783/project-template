@@ -5,6 +5,13 @@ on:
  pull_request:
 
 jobs:
+ ci-dockerfile:
+  runs-on: ubuntu-latest
+  steps:
+   - uses: actions/checkout@v4
+   - name: Build CI Dockerfile
+     run: docker build -f .github/workflows/ci.dockerfile .
+
  cleanup-images:
   permissions:
    packages: write
@@ -14,12 +21,12 @@ jobs:
      with:
       package-name: ${{ github.event.repository.name }}
       package-type: container
-      min-versions-to-keep: 1
+      min-versions-to-keep: 3
       delete-only-untagged-versions: false
       token: ${{ secrets.GITHUB_TOKEN }}
 
  build:
-  needs: cleanup-images
+  needs: [ci-dockerfile, cleanup-images]
   permissions:
    contents: read
    packages: write

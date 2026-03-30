@@ -377,6 +377,7 @@
             nativeBuildInputs = with pkgs; [
               zsh
               esbuild
+              removeReferencesTo
             ];
             env.NODE_ENV = "production";
             env.ESBUILD_BINARY_PATH = "${pkgs.esbuild}/bin/esbuild";
@@ -402,6 +403,8 @@
                 NATIVE_LIB=${nativeLib}/lib \
                 RUST_LIB=${rustLib}/lib \
                 SWIFT_LIB=${swiftLib}/lib
+              # Strip build-time nodejs reference — runtime uses nodejs-slim
+              find $out -type f -exec remove-references-to -t ${pkgs.nodejs} {} +
               runHook postInstall
             '';
             passthru.runtimeDeps = with pkgs; [
@@ -457,7 +460,7 @@
                 # standard search path so PID 1 can find default.target,
                 # multi-user.target, and friends inside the container.
                 mkdir -p $out/lib/systemd
-                ln -s ${pkgs.systemd}/lib/systemd/system $out/lib/systemd/system
+                ln -s ${pkgs.systemdMinimal}/lib/systemd/system $out/lib/systemd/system
 
                 mkdir -p $out/etc/systemd/system/multi-user.target.wants
 
@@ -504,12 +507,12 @@
               name = pkg.name;
               contents = pkg.runtimeDeps ++ [
                 pkgs.busybox
-                pkgs.systemd
+                pkgs.systemdMinimal
                 litestreamConfig
                 systemdUnits
               ];
               config = {
-                Cmd = [ "${pkgs.systemd}/lib/systemd/systemd" ];
+                Cmd = [ "${pkgs.systemdMinimal}/lib/systemd/systemd" ];
                 WorkingDir = "/app";
                 Env = [
                   "BACKEND_LISTEN_PORT=${port}"

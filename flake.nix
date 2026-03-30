@@ -419,13 +419,17 @@
                 NATIVE_LIB=${nativeLib}/lib \
                 RUST_LIB=${rustLib}/lib \
                 SWIFT_LIB=${swiftLib}/lib
-              # Strip build-time references — the .so/.o files are already
-              # copied into $out/lib so the original derivations aren't needed
+              # Strip build-time references. The native artifacts in lib/
+              # embed paths to the Swift/LLVM/Clang toolchain (~2.8GB)
+              # via swift-lib → clang-wrapper → clang-lib → llvm-lib.
+              # These .o/.swiftmodule files are not loaded at runtime so
+              # stripping their toolchain refs is safe.
               find $out -type f -exec remove-references-to \
                 -t ${pkgs.nodejs} \
                 -t ${nativeLib} \
                 -t ${rustLib} \
                 -t ${swiftLib} \
+                -t ${pkgs.swiftPackages.swift.swift.lib} \
                 {} +
               runHook postInstall
             '';
@@ -446,11 +450,17 @@
             dontCheck = true;
             runtimeDeps = typescriptApp.runtimeDeps;
             buildInputs = typescriptApp.runtimeDeps;
+            nativeBuildInputs = [ pkgs.removeReferencesTo ];
             installPhase = ''
               mkdir -p $out
               cp -a ${typescriptApp}/bin $out/
               cp -a ${typescriptApp}/lib $out/
               cp -a ${typescriptApp}/worker $out/
+              # Strip the reference to typescriptApp itself — all files
+              # are already copied into $out so the original is not needed.
+              find $out -type f -exec remove-references-to \
+                -t ${typescriptApp} \
+                {} +
             '';
             meta.mainProgram = "main.js";
           };

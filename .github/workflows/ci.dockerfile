@@ -1,5 +1,6 @@
 FROM ghcr.io/b521f771d8991e6f1d8e65ae05a8d783/base-tools/debian-tools-2:main
 
+ENV NODE_ENV=development
 WORKDIR /build
 COPY typescript/package.json typescript/package-lock.json typescript/
 RUN cd typescript && npm install

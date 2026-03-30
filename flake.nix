@@ -349,6 +349,7 @@
               [
                 swift
                 swiftPackages.swiftpm
+                clang
               ]
               # On Darwin, Dispatch/Foundation/XCTest are provided by the Apple SDK
               ++ lib.optionals pkgs.stdenv.isLinux [
@@ -492,44 +493,49 @@
                 # standard search path so PID 1 can find default.target,
                 # multi-user.target, and friends inside the container.
                 mkdir -p $out/lib/systemd
-                ln -s ${pkgs.systemdMinimal}/lib/systemd/system $out/lib/systemd/system
+                ln -s ${pkgs.systemdMinimal}/example/systemd/system $out/lib/systemd/system
 
                 mkdir -p $out/etc/systemd/system/multi-user.target.wants
 
-                cat > $out/etc/systemd/system/node-server.service <<'EOF'
-                [Unit]
-                Description=Node.js Express Server
+                # Override default.target to multi-user (the upstream
+                # default points to graphical.target which needs a
+                # display manager not present in containers).
+                ln -s multi-user.target $out/etc/systemd/system/default.target
 
-                [Service]
-                Type=simple
-                ExecStart=${pkgs.nodejs-slim}/bin/node ${pkg}/bin/${pkg.meta.mainProgram}
-                WorkingDirectory=/app
-                PassEnvironment=BACKEND_LISTEN_PORT BACKEND_LISTEN_HOSTNAME DISABLE_CLUSTER
-                Restart=always
-                RestartSec=3
+                cat > $out/etc/systemd/system/node-server.service <<EOF
+[Unit]
+Description=Node.js Express Server
 
-                [Install]
-                WantedBy=multi-user.target
-                EOF
+[Service]
+Type=simple
+ExecStart=${pkgs.nodejs-slim}/bin/node ${pkg}/bin/${pkg.meta.mainProgram}
+WorkingDirectory=/app
+PassEnvironment=BACKEND_LISTEN_PORT BACKEND_LISTEN_HOSTNAME DISABLE_CLUSTER
+Restart=always
+RestartSec=3
 
-                cat > $out/etc/systemd/system/litestream.service <<'EOF'
-                [Unit]
-                Description=Litestream SQLite Replication
-                After=node-server.service
-                ConditionEnvironment=LITESTREAM_URL
+[Install]
+WantedBy=multi-user.target
+EOF
 
-                [Service]
-                Type=simple
-                ExecStartPre=${pkgs.busybox}/bin/sh -c 'until [ -f /app/data.db ]; do sleep 1; done'
-                ExecStart=${pkgs.litestream}/bin/litestream replicate -config /etc/litestream.yml
-                WorkingDirectory=/app
-                PassEnvironment=LITESTREAM_URL
-                Restart=always
-                RestartSec=5
+                cat > $out/etc/systemd/system/litestream.service <<EOF
+[Unit]
+Description=Litestream SQLite Replication
+After=node-server.service
+ConditionEnvironment=LITESTREAM_URL
 
-                [Install]
-                WantedBy=multi-user.target
-                EOF
+[Service]
+Type=simple
+ExecStartPre=${pkgs.busybox}/bin/sh -c 'until [ -f /app/data.db ]; do sleep 1; done'
+ExecStart=${pkgs.litestream}/bin/litestream replicate -config /etc/litestream.yml
+WorkingDirectory=/app
+PassEnvironment=LITESTREAM_URL
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
 
                 ln -s ../node-server.service $out/etc/systemd/system/multi-user.target.wants/
                 ln -s ../litestream.service $out/etc/systemd/system/multi-user.target.wants/

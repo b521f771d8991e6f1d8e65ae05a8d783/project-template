@@ -5,14 +5,28 @@ on:
  pull_request:
 
 jobs:
+ cleanup-images:
+  permissions:
+   packages: write
+  runs-on: ubuntu-latest
+  steps:
+   - uses: actions/delete-package-versions@v5
+     with:
+      package-name: ${{ github.event.repository.name }}
+      package-type: container
+      min-versions-to-keep: 1
+      delete-only-untagged-versions: false
+      token: ${{ secrets.GITHUB_TOKEN }}
+
  build:
+  needs: cleanup-images
   permissions:
    contents: read
    packages: write
    actions: write
   strategy:
    matrix:
-    os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
+    os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15]
   runs-on: ${{ matrix.os }}
   steps:
    # Pin to version tags — for max supply-chain security upgrade to pinned SHAs

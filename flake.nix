@@ -297,6 +297,7 @@
             nativeBuildInputs =
               with pkgs;
               [
+                zsh
                 cmake
                 ninja
                 lld

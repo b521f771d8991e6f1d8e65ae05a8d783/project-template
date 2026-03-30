@@ -44,7 +44,7 @@ endif
 
 # ── Default (build everything) ────────────────────────────────────
 
-all: build-native build-rust build-swift build-typescript wasm
+all: build-native build-rust build-swift wasm build-typescript 
 
 # ── Development ────────────────────────────────────────────────────
 

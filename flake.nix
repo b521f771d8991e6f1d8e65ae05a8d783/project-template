@@ -453,6 +453,12 @@
               '';
 
               systemdUnits = pkgs.runCommand "systemd-units" { } ''
+                # Symlink systemd's own unit files (targets, etc.) into a
+                # standard search path so PID 1 can find default.target,
+                # multi-user.target, and friends inside the container.
+                mkdir -p $out/lib/systemd
+                ln -s ${pkgs.systemd}/lib/systemd/system $out/lib/systemd/system
+
                 mkdir -p $out/etc/systemd/system/multi-user.target.wants
 
                 cat > $out/etc/systemd/system/node-server.service <<'EOF'

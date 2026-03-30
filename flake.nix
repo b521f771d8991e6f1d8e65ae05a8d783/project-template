@@ -403,8 +403,14 @@
                 NATIVE_LIB=${nativeLib}/lib \
                 RUST_LIB=${rustLib}/lib \
                 SWIFT_LIB=${swiftLib}/lib
-              # Strip build-time nodejs reference — runtime uses nodejs-slim
-              find $out -type f -exec remove-references-to -t ${pkgs.nodejs} {} +
+              # Strip build-time references — the .so/.o files are already
+              # copied into $out/lib so the original derivations aren't needed
+              find $out -type f -exec remove-references-to \
+                -t ${pkgs.nodejs} \
+                -t ${nativeLib} \
+                -t ${rustLib} \
+                -t ${swiftLib} \
+                {} +
               runHook postInstall
             '';
             passthru.runtimeDeps = with pkgs; [

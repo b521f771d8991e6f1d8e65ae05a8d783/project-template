@@ -1,4 +1,5 @@
 # ── Toolchain ─────────────────────────────────────────────────────
+SHELL=zsh
 
 CC  := $(shell command -v clang)
 CXX := $(shell command -v clang++)

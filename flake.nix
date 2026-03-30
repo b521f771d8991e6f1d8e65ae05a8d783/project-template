@@ -51,6 +51,11 @@
         else
           [ ];
 
+      # ── SwiftPM dependency management (via swiftpm2nix) ──────────
+      # swiftpm2nix generates Nix expressions from `swift package resolve`
+      # output, enabling offline builds in Nix's sandbox. The generated
+      # files live in swift/nix/ and are checked into the repo.
+
       cargoToml = builtins.fromTOML (builtins.readFile ./rust/Cargo.toml);
       rustBinNames =
         let
@@ -194,6 +199,7 @@
           rustToolchain = mkRustToolchain pkgs;
           rustPlatform = mkRustPlatform pkgs;
           wasmPkg = mkWasmPkg pkgs;
+          swiftpmGenerated = pkgs.swiftpm2nix.helpers ./swift/nix;
 
           # ── Development tools (shared by devShell and builds) ──────
           devTools =
@@ -216,6 +222,7 @@
               wasm-bindgen-cli
               swift
               swiftPackages.swiftpm
+              swiftpm2nix
               swiftPackages.Dispatch
               swiftPackages.Foundation
               nodejs
@@ -268,9 +275,13 @@
                 env = lib.optionalAttrs pkgs.stdenv.isLinux {
                   LD_LIBRARY_PATH = "${pkgs.swiftPackages.Dispatch}/lib";
                 };
+                configurePhase = ''
+                  cd swift
+                  ${swiftpmGenerated.configure}
+                '';
                 buildPhase = ''
                   export HOME=$TMPDIR
-                  cd swift && swift build -c release --product ${binName}
+                  swift build -c release --product ${binName}
                 '';
                 installPhase = ''
                   runHook preInstall
@@ -348,6 +359,11 @@
             env = lib.optionalAttrs pkgs.stdenv.isLinux {
               LD_LIBRARY_PATH = "${pkgs.swiftPackages.Dispatch}/lib";
             };
+            configurePhase = ''
+              cd swift
+              ${swiftpmGenerated.configure}
+              cd ..
+            '';
             buildPhase = ''
               export HOME=$TMPDIR
               make build-swift

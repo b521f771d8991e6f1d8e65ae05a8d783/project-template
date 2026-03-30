@@ -9,6 +9,9 @@ let package = Package(
             name: "project-template",
             targets: ["project-template"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/stephencelis/SQLite.swift.git", from: "0.15.3"),
+    ],
     targets: [
         .target(
             name: "project-template",
@@ -20,7 +23,10 @@ let package = Package(
             resources: [.process("Resources")]),
         .testTarget(
             name: "project-templateTests",
-            dependencies: ["project-template"],
+            dependencies: [
+                "project-template",
+                .product(name: "SQLite", package: "SQLite.swift"),
+            ],
             path: "Tests/project-templateTests"),
     ]
 )

@@ -3,6 +3,6 @@ import XCTest
 
 final class project_templateTests: XCTestCase {
     func testExample() throws {
-        sayHello()
+        XCTAssertEqual(ProjectTemplate.version, "0.1.0")
     }
 }

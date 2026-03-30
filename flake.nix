@@ -457,6 +457,9 @@
               cp -a ${typescriptApp}/bin $out/
               cp -a ${typescriptApp}/lib $out/
               cp -a ${typescriptApp}/worker $out/
+              # Make files writable so remove-references-to (which uses
+              # sed -i internally) can modify them in place.
+              chmod -R u+w $out
               # Strip the reference to typescriptApp itself — all files
               # are already copied into $out so the original is not needed.
               find $out -type f -exec remove-references-to \

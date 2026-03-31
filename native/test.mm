@@ -14,6 +14,4 @@ NS_ROOT_CLASS
 
 const SEL selector = @selector(lowercaseString);
 
-extern "C" int get1FromObjCpp(void) {
-  return 1;
-}
+extern "C" int get1FromObjCpp(void) { return 1; }

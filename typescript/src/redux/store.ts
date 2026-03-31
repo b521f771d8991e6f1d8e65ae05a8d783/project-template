@@ -1,10 +1,5 @@
 import { apiSlice } from "@/redux/state/apiSlice";
-import {
-	Action,
-	configureStore,
-	isPlain,
-	ThunkAction,
-} from "@reduxjs/toolkit";
+import { Action, configureStore, isPlain, ThunkAction } from "@reduxjs/toolkit";
 import { useDispatch, useSelector } from "react-redux";
 
 /**

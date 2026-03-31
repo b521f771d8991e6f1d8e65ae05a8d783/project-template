@@ -24,9 +24,11 @@ export default function RootLayout() {
 		<SafeAreaProvider>
 			<Provider store={store}>
 				<View className="select-none">
-					<Stack screenOptions={{
-						headerShown: isEmbedded ? false : true
-					}}/>
+					<Stack
+						screenOptions={{
+							headerShown: isEmbedded ? false : true,
+						}}
+					/>
 				</View>
 			</Provider>
 		</SafeAreaProvider>

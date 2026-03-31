@@ -35,7 +35,8 @@ function waitForServer(port: number, retries = 50): Promise<void> {
 	});
 }
 
-app.whenReady()
+app
+	.whenReady()
 	.then(async () => {
 		const port = await findFreePort(8081);
 

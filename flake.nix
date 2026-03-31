@@ -193,435 +193,453 @@
     in
     # ── Per-system outputs ──────────────────────────────────────────
     flake-utils.lib.eachSystem supportedSystems (
-        system:
-        let
-          pkgs = mkPkgs system;
-          rustToolchain = mkRustToolchain pkgs;
-          rustPlatform = mkRustPlatform pkgs;
-          wasmPkg = mkWasmPkg pkgs;
-          swiftpmGenerated = pkgs.swiftpm2nix.helpers ./swift/nix;
+      system:
+      let
+        pkgs = mkPkgs system;
+        rustToolchain = mkRustToolchain pkgs;
+        rustPlatform = mkRustPlatform pkgs;
+        wasmPkg = mkWasmPkg pkgs;
+        swiftpmGenerated = pkgs.swiftpm2nix.helpers ./swift/nix;
 
-          # ── Development tools (shared by devShell and builds) ──────
-          devTools =
+        # ── Development tools (shared by devShell and builds) ──────
+        devTools =
+          with pkgs;
+          [
+            git
+            zsh
+            pkg-config
+            cmake
+            ninja
+            python3
+            which
+            clang
+            lld
+            clang-tools
+            esbuild
+            rustToolchain
+            bacon
+            wasm-pack
+            wasm-bindgen-cli
+            swift
+            swiftPackages.swiftpm
+            swiftpm2nix
+            swiftPackages.Dispatch
+            swiftPackages.Foundation
+            nodejs
+          ]
+          ++ lib.optionals pkgs.stdenv.isLinux [ gnustep-libobjc ]
+          ++ lib.optionals pkgs.stdenv.isDarwin [ apple-sdk ];
+
+        # ── Package derivations ───────────────────────────────────
+
+        # Native Rust binaries (one per discovered bin target, prefixed "rust-")
+        rustBins = builtins.listToAttrs (
+          map (binName: {
+            name = "rust-${binName}";
+            value = rustPlatform.buildRustPackage {
+              pname = binName;
+              version = cargoToml.package.version;
+              src = ./rust;
+              cargoLock.lockFile = ./rust/Cargo.lock;
+              cargoBuildFlags = [
+                "--bin"
+                binName
+              ];
+              cargoTestFlags = [
+                "--bin"
+                binName
+              ];
+            };
+          }) rustBinNames
+        );
+
+        # Native Swift binaries (one per discovered executable target, prefixed "swift-")
+        swiftBins = builtins.listToAttrs (
+          map (binName: {
+            name = "swift-${binName}";
+            value = pkgs.swiftPackages.stdenv.mkDerivation {
+              pname = binName;
+              version = "0.1.0";
+              src = mkSrcWith ./swift;
+              nativeBuildInputs =
+                with pkgs;
+                [
+                  swift
+                  swiftPackages.swiftpm
+                  makeWrapper
+                ]
+                ++ lib.optionals pkgs.stdenv.isLinux [
+                  swiftPackages.Dispatch
+                  swiftPackages.Foundation
+                ];
+              env = lib.optionalAttrs pkgs.stdenv.isLinux {
+                LD_LIBRARY_PATH = "${pkgs.swiftPackages.Dispatch}/lib";
+              };
+              configurePhase = ''
+                cd swift
+                ${swiftpmGenerated.configure}
+              '';
+              buildPhase = ''
+                export HOME=$TMPDIR
+                swift build -c release --product ${binName}
+              '';
+              installPhase = ''
+                runHook preInstall
+                mkdir -p $out/bin
+                buildDir=$(swift build -c release --show-bin-path)
+                cp "$buildDir/${binName}" $out/bin/.${binName}-wrapped
+                # Copy any Swift resource bundles alongside the binary
+                for bundle in "$buildDir"/*.resources; do
+                  [ -e "$bundle" ] && cp -r "$bundle" $out/bin/
+                done
+                makeWrapper $out/bin/.${binName}-wrapped $out/bin/${binName} \
+                  ${lib.optionalString pkgs.stdenv.isLinux "--set LD_LIBRARY_PATH ${pkgs.swiftPackages.Dispatch}/lib"}
+                runHook postInstall
+              '';
+              meta.mainProgram = binName;
+            };
+          }) swiftBinNames
+        );
+
+        # C/C++/Objective-C shared library built with clang + CMake/Ninja
+        nativeLib = pkgs.clangStdenv.mkDerivation {
+          name = "native-lib";
+          src = mkSrcWith ./native;
+          nativeBuildInputs =
             with pkgs;
             [
-              git
               zsh
-              pkg-config
               cmake
               ninja
-              python3
-              which
-              clang
               lld
-              clang-tools
-              esbuild
-              rustToolchain
-              bacon
-              wasm-pack
-              wasm-bindgen-cli
-              swift
-              swiftPackages.swiftpm
-              swiftpm2nix
-              swiftPackages.Dispatch
-              swiftPackages.Foundation
-              nodejs
             ]
             ++ lib.optionals pkgs.stdenv.isLinux [ gnustep-libobjc ]
             ++ lib.optionals pkgs.stdenv.isDarwin [ apple-sdk ];
+          env.PROJECT_NAME = "native-lib";
+          configurePhase = "true";
+          buildPhase = "make build-native";
+          checkPhase = "make test-native";
+          installPhase = ''
+            mkdir -p $out/lib
+            cp native/build/libcore.so $out/lib/ 2>/dev/null || true
+            cp native/build/libcore.dylib $out/lib/ 2>/dev/null || true
+          '';
+        };
 
-          # ── Package derivations ───────────────────────────────────
+        # Rust library crate (produces .rlib / .so / .dylib)
+        rustLib = rustPlatform.buildRustPackage {
+          pname = "rust-lib";
+          version = "0.1.0";
+          src = ./rust;
+          cargoLock.lockFile = ./rust/Cargo.lock;
+          installPhase = ''
+            runHook preInstall
+            mkdir -p $out/lib
+            find target -path "*/release/librust*" -type f -exec cp {} $out/lib/ \;
+            runHook postInstall
+          '';
+        };
 
-          # Native Rust binaries (one per discovered bin target, prefixed "rust-")
-          rustBins = builtins.listToAttrs (
-            map (binName: {
-              name = "rust-${binName}";
-              value = rustPlatform.buildRustPackage {
-                pname = binName;
-                version = cargoToml.package.version;
-                src = ./rust;
-                cargoLock.lockFile = ./rust/Cargo.lock;
-                cargoBuildFlags = [
-                  "--bin"
-                  binName
-                ];
-                cargoTestFlags = [
-                  "--bin"
-                  binName
-                ];
-              };
-            }) rustBinNames
-          );
-
-          # Native Swift binaries (one per discovered executable target, prefixed "swift-")
-          swiftBins = builtins.listToAttrs (
-            map (binName: {
-              name = "swift-${binName}";
-              value = pkgs.swiftPackages.stdenv.mkDerivation {
-                pname = binName;
-                version = "0.1.0";
-                src = mkSrcWith ./swift;
-                nativeBuildInputs =
-                  with pkgs;
-                  [
-                    swift
-                    swiftPackages.swiftpm
-                    makeWrapper
-                  ]
-                  ++ lib.optionals pkgs.stdenv.isLinux [
-                    swiftPackages.Dispatch
-                    swiftPackages.Foundation
-                  ];
-                env = lib.optionalAttrs pkgs.stdenv.isLinux {
-                  LD_LIBRARY_PATH = "${pkgs.swiftPackages.Dispatch}/lib";
-                };
-                configurePhase = ''
-                  cd swift
-                  ${swiftpmGenerated.configure}
-                '';
-                buildPhase = ''
-                  export HOME=$TMPDIR
-                  swift build -c release --product ${binName}
-                '';
-                installPhase = ''
-                  runHook preInstall
-                  mkdir -p $out/bin
-                  buildDir=$(swift build -c release --show-bin-path)
-                  cp "$buildDir/${binName}" $out/bin/.${binName}-wrapped
-                  # Copy any Swift resource bundles alongside the binary
-                  for bundle in "$buildDir"/*.resources; do
-                    [ -e "$bundle" ] && cp -r "$bundle" $out/bin/
-                  done
-                  makeWrapper $out/bin/.${binName}-wrapped $out/bin/${binName} \
-                    ${lib.optionalString pkgs.stdenv.isLinux "--set LD_LIBRARY_PATH ${pkgs.swiftPackages.Dispatch}/lib"}
-                  runHook postInstall
-                '';
-                meta.mainProgram = binName;
-              };
-            }) swiftBinNames
-          );
-
-          # C/C++/Objective-C shared library built with clang + CMake/Ninja
-          nativeLib = pkgs.clangStdenv.mkDerivation {
-            name = "native-lib";
-            src = mkSrcWith ./native;
-            nativeBuildInputs =
-              with pkgs;
-              [
-                zsh
-                cmake
-                ninja
-                lld
-              ]
-              ++ lib.optionals pkgs.stdenv.isLinux [ gnustep-libobjc ]
-              ++ lib.optionals pkgs.stdenv.isDarwin [ apple-sdk ];
-            env.PROJECT_NAME = "native-lib";
-            configurePhase = "true";
-            buildPhase = "make build-native";
-            checkPhase = "make test-native";
-            installPhase = ''
-              mkdir -p $out/lib
-              cp native/build/libcore.so $out/lib/ 2>/dev/null || true
-              cp native/build/libcore.dylib $out/lib/ 2>/dev/null || true
-            '';
+        # Swift library (compiled modules + object files)
+        swiftLib = pkgs.swiftPackages.stdenv.mkDerivation {
+          name = "swift-lib";
+          src = mkSrcWith ./swift;
+          nativeBuildInputs =
+            with pkgs;
+            [
+              swift
+              swiftPackages.swiftpm
+              clang
+            ]
+            # On Darwin, Dispatch/Foundation/XCTest are provided by the Apple SDK
+            ++ lib.optionals pkgs.stdenv.isLinux [
+              swiftPackages.Dispatch
+              swiftPackages.Foundation
+              swiftPackages.XCTest
+            ];
+          env = lib.optionalAttrs pkgs.stdenv.isLinux {
+            LD_LIBRARY_PATH = "${pkgs.swiftPackages.Dispatch}/lib";
           };
+          configurePhase = ''
+            cd swift
+            ${swiftpmGenerated.configure}
+            cd ..
+          '';
+          buildPhase = ''
+            export HOME=$TMPDIR
+            make build-swift
+          '';
+          checkPhase = ''
+            export HOME=$TMPDIR
+            make test-swift
+          '';
+          installPhase = ''
+            mkdir -p $out/lib/swift
+            buildDir=$(cd swift && swift build -c release --show-bin-path)
+            cp "$buildDir"/*.swiftmodule "$buildDir"/*.swiftdoc "$buildDir"/*.swiftsourceinfo $out/lib/swift/ 2>/dev/null || true
+            cp "$buildDir"/project_template.build/*.o $out/lib/ 2>/dev/null || true
+          '';
+        };
 
-          # Rust library crate (produces .rlib / .so / .dylib)
-          rustLib = rustPlatform.buildRustPackage {
-            pname = "rust-lib";
-            version = "0.1.0";
-            src = ./rust;
-            cargoLock.lockFile = ./rust/Cargo.lock;
-            installPhase = ''
-              runHook preInstall
-              mkdir -p $out/lib
-              find target -path "*/release/librust*" -type f -exec cp {} $out/lib/ \;
-              runHook postInstall
+        # TypeScript web application — bundles the WASM package, native lib,
+        # Rust lib, and Swift lib into a deployable artifact with:
+        #   - Expo static export + Node.js server (bin/main.js)
+        #   - Cloudflare Worker bundle (worker/worker.js)
+        typescriptApp = pkgs.buildNpmPackage {
+          pname = "typescript-app";
+          version = "0.0.0";
+          src = ./typescript;
+          npmDeps = pkgs.importNpmLock { npmRoot = ./typescript; };
+          npmConfigHook = pkgs.importNpmLock.npmConfigHook;
+          nativeBuildInputs = with pkgs; [
+            zsh
+            esbuild
+            removeReferencesTo
+          ];
+          env.NODE_ENV = "production";
+          env.ESBUILD_BINARY_PATH = "${pkgs.esbuild}/bin/esbuild";
+          preBuild = ''
+            export HOME=$TMPDIR
+            mkdir -p ../rust/target/npm-pkg
+            cp -r ${wasmPkg}/* ../rust/target/npm-pkg/
+          '';
+          buildPhase = ''
+            runHook preBuild
+            # Expo static export + Node server
+            npm run build
+            # Cloudflare Worker entry point
+            npx esbuild src/worker.ts --outfile=./dist/worker.js --platform=browser --bundle --minify --format=esm '--external:node:*'
+            runHook postBuild
+          '';
+          checkPhase = "npx jest";
+          installPhase = ''
+            runHook preInstall
+            make -f ${./Makefile} install \
+              DIST=$out \
+              TS_DIST=dist \
+              NATIVE_LIB=${nativeLib}/lib \
+              RUST_LIB=${rustLib}/lib \
+              SWIFT_LIB=${swiftLib}/lib
+            # Strip build-time references. The native artifacts in lib/
+            # embed paths to the Swift/LLVM/Clang toolchain (~2.8GB)
+            # via swift-lib → clang-wrapper → clang-lib → llvm-lib.
+            # These .o/.swiftmodule files are not loaded at runtime so
+            # stripping their toolchain refs is safe.
+            find $out -type f -exec remove-references-to \
+              -t ${pkgs.nodejs} \
+              -t ${nativeLib} \
+              -t ${rustLib} \
+              -t ${swiftLib} \
+              -t ${pkgs.swiftPackages.swift.swift.lib} \
+              -t ${pkgs.swiftPackages.swift} \
+              -t ${pkgs.swiftPackages.swiftpm} \
+              -t ${pkgs.swiftPackages.stdenv.cc} \
+              -t ${pkgs.swiftPackages.stdenv.cc.cc} \
+              -t ${pkgs.swiftPackages.stdenv.cc.cc.lib} \
+              -t ${pkgs.clangStdenv.cc} \
+              -t ${pkgs.clangStdenv.cc.cc} \
+              -t ${pkgs.clangStdenv.cc.cc.lib} \
+              -t ${pkgs.gcc.cc} \
+              -t ${pkgs.gcc.cc.lib} \
+              -t ${pkgs.python3} \
+              {} +
+            runHook postInstall
+          '';
+          passthru.runtimeDeps = with pkgs; [
+            nodejs-slim
+            litestream
+          ];
+          meta.mainProgram = "main.js";
+        };
+
+        # Thin wrapper around typescriptApp that copies the final artifacts
+        # into a clean output (bin/, lib/, worker/) for deployment.
+        webApp = pkgs.stdenv.mkDerivation {
+          name = "web-app";
+          dontUnpack = true;
+          dontConfigure = true;
+          dontBuild = true;
+          dontCheck = true;
+          runtimeDeps = typescriptApp.runtimeDeps;
+          buildInputs = typescriptApp.runtimeDeps;
+          nativeBuildInputs = [ pkgs.removeReferencesTo ];
+          installPhase = ''
+            mkdir -p $out
+            cp -a ${typescriptApp}/bin $out/
+            cp -a ${typescriptApp}/lib $out/
+            cp -a ${typescriptApp}/worker $out/
+            # Make files writable so remove-references-to (which uses
+            # sed -i internally) can modify them in place.
+            chmod -R u+w $out
+            # Remove compile-time Swift artifacts (.o, .swiftmodule, etc.)
+            # that are not loaded at runtime but embed references to the
+            # Swift/Clang/LLVM build toolchain (~2.8 GB).
+            find $out/lib -type f \( -name '*.o' -o -name '*.swiftmodule' \
+              -o -name '*.swiftdoc' -o -name '*.swiftsourceinfo' \) -delete
+            # Strip the reference to typescriptApp itself — all files
+            # are already copied into $out so the original is not needed.
+            find $out -type f -exec remove-references-to \
+              -t ${typescriptApp} \
+              {} +
+          '';
+          meta.mainProgram = "main.js";
+        };
+
+        # Debug variant (same build, different name for identification)
+        webAppDebug = webApp.overrideAttrs (_: {
+          name = "web-app-debug";
+        });
+
+        # ── Docker image builder ──────────────────────────────────
+        # Creates a layered OCI image with two systemd services:
+        #   1. node-server  — the Node.js Express backend
+        #   2. litestream   — SQLite replication (only starts if LITESTREAM_URL is set)
+        # The image uses systemd as PID 1 to manage both services.
+        buildImage =
+          pkg:
+          let
+            port = "8081";
+
+            litestreamConfig = pkgs.writeTextDir "etc/litestream.yml" ''
+              dbs:
+                - path: /app/data.db
+                  replicas:
+                    - url: $LITESTREAM_URL
             '';
-          };
 
-          # Swift library (compiled modules + object files)
-          swiftLib = pkgs.swiftPackages.stdenv.mkDerivation {
-            name = "swift-lib";
-            src = mkSrcWith ./swift;
-            nativeBuildInputs =
-              with pkgs;
-              [
-                swift
-                swiftPackages.swiftpm
-                clang
-              ]
-              # On Darwin, Dispatch/Foundation/XCTest are provided by the Apple SDK
-              ++ lib.optionals pkgs.stdenv.isLinux [
-                swiftPackages.Dispatch
-                swiftPackages.Foundation
-                swiftPackages.XCTest
+            systemdUnits = pkgs.runCommand "systemd-units" { } ''
+                              # Symlink systemd's own unit files (targets, etc.) into a
+                              # standard search path so PID 1 can find default.target,
+                              # multi-user.target, and friends inside the container.
+                              mkdir -p $out/lib/systemd
+                              ln -s ${pkgs.systemdMinimal}/example/systemd/system $out/lib/systemd/system
+
+                              mkdir -p $out/etc/systemd/system/multi-user.target.wants
+
+                              # Override default.target to multi-user (the upstream
+                              # default points to graphical.target which needs a
+                              # display manager not present in containers).
+                              ln -s multi-user.target $out/etc/systemd/system/default.target
+
+                              cat > $out/etc/systemd/system/node-server.service <<EOF
+              [Unit]
+              Description=Node.js Express Server
+
+              [Service]
+              Type=simple
+              ExecStart=${pkgs.nodejs-slim}/bin/node ${pkg}/bin/${pkg.meta.mainProgram}
+              WorkingDirectory=/app
+              PassEnvironment=BACKEND_LISTEN_PORT BACKEND_LISTEN_HOSTNAME DISABLE_CLUSTER
+              Restart=always
+              RestartSec=3
+
+              [Install]
+              WantedBy=multi-user.target
+              EOF
+
+                              cat > $out/etc/systemd/system/litestream.service <<EOF
+              [Unit]
+              Description=Litestream SQLite Replication
+              After=node-server.service
+              ConditionEnvironment=LITESTREAM_URL
+
+              [Service]
+              Type=simple
+              ExecStartPre=${pkgs.busybox}/bin/sh -c 'until [ -f /app/data.db ]; do sleep 1; done'
+              ExecStart=${pkgs.litestream}/bin/litestream replicate -config /etc/litestream.yml
+              WorkingDirectory=/app
+              PassEnvironment=LITESTREAM_URL
+              Restart=always
+              RestartSec=5
+
+              [Install]
+              WantedBy=multi-user.target
+              EOF
+
+                              ln -s ../node-server.service $out/etc/systemd/system/multi-user.target.wants/
+                              ln -s ../litestream.service $out/etc/systemd/system/multi-user.target.wants/
+            '';
+          in
+          pkgs.dockerTools.buildLayeredImage {
+            name = pkg.name;
+            contents = pkg.runtimeDeps ++ [
+              pkgs.busybox
+              pkgs.systemdMinimal
+              litestreamConfig
+              systemdUnits
+            ];
+            config = {
+              Cmd = [ "${pkgs.systemdMinimal}/lib/systemd/systemd" ];
+              WorkingDir = "/app";
+              Env = [
+                "BACKEND_LISTEN_PORT=${port}"
+                "BACKEND_LISTEN_HOSTNAME=0.0.0.0"
               ];
-            env = lib.optionalAttrs pkgs.stdenv.isLinux {
-              LD_LIBRARY_PATH = "${pkgs.swiftPackages.Dispatch}/lib";
+              ExposedPorts.${port} = { };
+              Healthcheck = {
+                Test = [
+                  "${pkgs.curlMinimal}/bin/curl"
+                  "-f"
+                  "-s"
+                  "localhost:${port}/api/status"
+                ];
+                Interval = 30000000000;
+                Timeout = 10000000000;
+                Retries = 3;
+              };
+              Volumes."/app" = { };
             };
-            configurePhase = ''
-              cd swift
-              ${swiftpmGenerated.configure}
-              cd ..
-            '';
-            buildPhase = ''
-              export HOME=$TMPDIR
-              make build-swift
-            '';
-            checkPhase = ''
-              export HOME=$TMPDIR
-              make test-swift
-            '';
-            installPhase = ''
-              mkdir -p $out/lib/swift
-              buildDir=$(cd swift && swift build -c release --show-bin-path)
-              cp "$buildDir"/*.swiftmodule "$buildDir"/*.swiftdoc "$buildDir"/*.swiftsourceinfo $out/lib/swift/ 2>/dev/null || true
-              cp "$buildDir"/project_template.build/*.o $out/lib/ 2>/dev/null || true
-            '';
           };
-
-          # TypeScript web application — bundles the WASM package, native lib,
-          # Rust lib, and Swift lib into a deployable artifact with:
-          #   - Expo static export + Node.js server (bin/main.js)
-          #   - Cloudflare Worker bundle (worker/worker.js)
-          typescriptApp = pkgs.buildNpmPackage {
-            pname = "typescript-app";
-            version = "0.0.0";
-            src = ./typescript;
-            npmDeps = pkgs.importNpmLock { npmRoot = ./typescript; };
-            npmConfigHook = pkgs.importNpmLock.npmConfigHook;
-            nativeBuildInputs = with pkgs; [
-              zsh
-              esbuild
-              removeReferencesTo
-            ];
-            env.NODE_ENV = "production";
-            env.ESBUILD_BINARY_PATH = "${pkgs.esbuild}/bin/esbuild";
-            preBuild = ''
-              export HOME=$TMPDIR
-              mkdir -p ../rust/target/npm-pkg
-              cp -r ${wasmPkg}/* ../rust/target/npm-pkg/
-            '';
-            buildPhase = ''
-              runHook preBuild
-              # Expo static export + Node server
-              npm run build
-              # Cloudflare Worker entry point
-              npx esbuild src/worker.ts --outfile=./dist/worker.js --platform=browser --bundle --minify --format=esm '--external:node:*'
-              runHook postBuild
-            '';
-            checkPhase = "npx jest";
-            installPhase = ''
-              runHook preInstall
-              make -f ${./Makefile} install \
-                DIST=$out \
-                TS_DIST=dist \
-                NATIVE_LIB=${nativeLib}/lib \
-                RUST_LIB=${rustLib}/lib \
-                SWIFT_LIB=${swiftLib}/lib
-              # Strip build-time references. The native artifacts in lib/
-              # embed paths to the Swift/LLVM/Clang toolchain (~2.8GB)
-              # via swift-lib → clang-wrapper → clang-lib → llvm-lib.
-              # These .o/.swiftmodule files are not loaded at runtime so
-              # stripping their toolchain refs is safe.
-              find $out -type f -exec remove-references-to \
-                -t ${pkgs.nodejs} \
-                -t ${nativeLib} \
-                -t ${rustLib} \
-                -t ${swiftLib} \
-                -t ${pkgs.swiftPackages.swift.swift.lib} \
-                {} +
-              runHook postInstall
-            '';
-            passthru.runtimeDeps = with pkgs; [
-              nodejs-slim
-              litestream
-            ];
-            meta.mainProgram = "main.js";
-          };
-
-          # Thin wrapper around typescriptApp that copies the final artifacts
-          # into a clean output (bin/, lib/, worker/) for deployment.
-          webApp = pkgs.stdenv.mkDerivation {
-            name = "web-app";
+      in
+      rec {
+        # ── Exported packages ──────────────────────────────────────
+        # Build with: nix build .#<name>   (e.g. nix build .#web-app)
+        packages = {
+          "web-app" = webApp;
+          "web-app-debug" = webAppDebug;
+          "native-lib" = nativeLib;
+          "rust-lib" = rustLib;
+          "swift-lib" = swiftLib;
+          "typescript-app" = typescriptApp;
+          cloudflare = pkgs.stdenv.mkDerivation {
+            name = "cloudflare";
             dontUnpack = true;
             dontConfigure = true;
             dontBuild = true;
             dontCheck = true;
-            runtimeDeps = typescriptApp.runtimeDeps;
-            buildInputs = typescriptApp.runtimeDeps;
-            nativeBuildInputs = [ pkgs.removeReferencesTo ];
             installPhase = ''
               mkdir -p $out
-              cp -a ${typescriptApp}/bin $out/
-              cp -a ${typescriptApp}/lib $out/
-              cp -a ${typescriptApp}/worker $out/
-              # Make files writable so remove-references-to (which uses
-              # sed -i internally) can modify them in place.
-              chmod -R u+w $out
-              # Strip the reference to typescriptApp itself — all files
-              # are already copied into $out so the original is not needed.
-              find $out -type f -exec remove-references-to \
-                -t ${typescriptApp} \
-                {} +
+              cp ${typescriptApp}/worker/worker.js $out/
+              cp -r ${typescriptApp}/worker/assets $out/
             '';
-            meta.mainProgram = "main.js";
           };
-
-          # Debug variant (same build, different name for identification)
-          webAppDebug = webApp.overrideAttrs (_: {
-            name = "web-app-debug";
-          });
-
-          # ── Docker image builder ──────────────────────────────────
-          # Creates a layered OCI image with two systemd services:
-          #   1. node-server  — the Node.js Express backend
-          #   2. litestream   — SQLite replication (only starts if LITESTREAM_URL is set)
-          # The image uses systemd as PID 1 to manage both services.
-          buildImage =
-            pkg:
-            let
-              port = "8081";
-
-              litestreamConfig = pkgs.writeTextDir "etc/litestream.yml" ''
-                dbs:
-                  - path: /app/data.db
-                    replicas:
-                      - url: $LITESTREAM_URL
-              '';
-
-              systemdUnits = pkgs.runCommand "systemd-units" { } ''
-                # Symlink systemd's own unit files (targets, etc.) into a
-                # standard search path so PID 1 can find default.target,
-                # multi-user.target, and friends inside the container.
-                mkdir -p $out/lib/systemd
-                ln -s ${pkgs.systemdMinimal}/example/systemd/system $out/lib/systemd/system
-
-                mkdir -p $out/etc/systemd/system/multi-user.target.wants
-
-                # Override default.target to multi-user (the upstream
-                # default points to graphical.target which needs a
-                # display manager not present in containers).
-                ln -s multi-user.target $out/etc/systemd/system/default.target
-
-                cat > $out/etc/systemd/system/node-server.service <<EOF
-[Unit]
-Description=Node.js Express Server
-
-[Service]
-Type=simple
-ExecStart=${pkgs.nodejs-slim}/bin/node ${pkg}/bin/${pkg.meta.mainProgram}
-WorkingDirectory=/app
-PassEnvironment=BACKEND_LISTEN_PORT BACKEND_LISTEN_HOSTNAME DISABLE_CLUSTER
-Restart=always
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-                cat > $out/etc/systemd/system/litestream.service <<EOF
-[Unit]
-Description=Litestream SQLite Replication
-After=node-server.service
-ConditionEnvironment=LITESTREAM_URL
-
-[Service]
-Type=simple
-ExecStartPre=${pkgs.busybox}/bin/sh -c 'until [ -f /app/data.db ]; do sleep 1; done'
-ExecStart=${pkgs.litestream}/bin/litestream replicate -config /etc/litestream.yml
-WorkingDirectory=/app
-PassEnvironment=LITESTREAM_URL
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-                ln -s ../node-server.service $out/etc/systemd/system/multi-user.target.wants/
-                ln -s ../litestream.service $out/etc/systemd/system/multi-user.target.wants/
-              '';
-            in
-            pkgs.dockerTools.buildLayeredImage {
-              name = pkg.name;
-              contents = pkg.runtimeDeps ++ [
-                pkgs.busybox
-                pkgs.systemdMinimal
-                litestreamConfig
-                systemdUnits
-              ];
-              config = {
-                Cmd = [ "${pkgs.systemdMinimal}/lib/systemd/systemd" ];
-                WorkingDir = "/app";
-                Env = [
-                  "BACKEND_LISTEN_PORT=${port}"
-                  "BACKEND_LISTEN_HOSTNAME=0.0.0.0"
-                ];
-                ExposedPorts.${port} = { };
-                Healthcheck = {
-                  Test = [
-                    "${pkgs.curlMinimal}/bin/curl"
-                    "-f"
-                    "-s"
-                    "localhost:${port}/api/status"
-                  ];
-                  Interval = 30000000000;
-                  Timeout = 10000000000;
-                  Retries = 3;
-                };
-                Volumes."/app" = { };
-              };
-            };
-        in
-        rec {
-          # ── Exported packages ──────────────────────────────────────
-          # Build with: nix build .#<name>   (e.g. nix build .#web-app)
-          packages = {
-            "web-app" = webApp;
-            "web-app-debug" = webAppDebug;
-            "native-lib" = nativeLib;
-            "rust-lib" = rustLib;
-            "swift-lib" = swiftLib;
-            "typescript-app" = typescriptApp;
-            cloudflare = pkgs.stdenv.mkDerivation {
-              name = "cloudflare";
-              dontUnpack = true;
-              dontConfigure = true;
-              dontBuild = true;
-              dontCheck = true;
-              installPhase = ''
-                mkdir -p $out
-                cp ${typescriptApp}/worker/worker.js $out/
-                cp -r ${typescriptApp}/worker/assets $out/
-              '';
-            };
-            default = webApp;
-          }
-          // rustBins # merge in native Rust binary packages (rust-<name>)
-          // swiftBins # merge in native Swift binary packages (swift-<name>)
-          # WASM packages — platform-independent output built using this system's toolchain
-          // { "wasm-pkg" = mkWasmPkg pkgs; }
-          // (mkWasmBins pkgs)
-          # Docker images require busybox + systemd, which are Linux-only
-          // lib.optionalAttrs pkgs.stdenv.isLinux {
-            "docker-image" = buildImage webApp;
-            "docker-image-debug" = buildImage webAppDebug;
-          };
-          # `nix flake check` builds every package except "default" (which
-          # is an alias and would duplicate work).
-          checks = builtins.removeAttrs packages [ "default" ];
-
-          # ── Development shell ──────────────────────────────────────
-          # Enter with: nix develop
-          # Provides all compilers, tools, and a VSCodium instance with
-          # pre-configured extensions for the full polyglot stack.
-          devShells.default = pkgs.mkShell {
-            packages = devTools;
-            env.ESBUILD_BINARY_PATH = "${pkgs.esbuild}/bin/esbuild";
-          };
-          formatter = pkgs.nixfmt-tree; # `nix fmt` uses nixfmt-tree
+          default = webApp;
         }
-      );
+        // rustBins # merge in native Rust binary packages (rust-<name>)
+        // swiftBins # merge in native Swift binary packages (swift-<name>)
+        # WASM packages — platform-independent output built using this system's toolchain
+        // {
+          "wasm-pkg" = mkWasmPkg pkgs;
+        }
+        // (mkWasmBins pkgs)
+        # Docker images require busybox + systemd, which are Linux-only
+        // lib.optionalAttrs pkgs.stdenv.isLinux {
+          "docker-image" = buildImage webApp;
+          "docker-image-debug" = buildImage webAppDebug;
+        };
+        # `nix flake check` builds every package except "default" (which
+        # is an alias and would duplicate work).
+        checks = builtins.removeAttrs packages [ "default" ];
+
+        # ── Development shell ──────────────────────────────────────
+        # Enter with: nix develop
+        # Provides all compilers, tools, and a VSCodium instance with
+        # pre-configured extensions for the full polyglot stack.
+        devShells.default = pkgs.mkShell {
+          packages = devTools;
+          env.ESBUILD_BINARY_PATH = "${pkgs.esbuild}/bin/esbuild";
+        };
+        formatter = pkgs.nixfmt-tree; # `nix fmt` uses nixfmt-tree
+      }
+    );
 }

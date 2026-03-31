@@ -45,7 +45,7 @@ endif
 
 # ── Default (build everything) ────────────────────────────────────
 
-all: build-native build-rust build-swift wasm build-typescript 
+all: build-native build-rust build-swift wasm build-typescript
 
 # ── Development ────────────────────────────────────────────────────
 
@@ -61,15 +61,15 @@ dev:
 .PHONY: build-native build-native-debug test-native clean-native
 
 build-native:
-	cd native && PROJECT_NAME=native-lib cmake -G Ninja -S . -B build --preset $(NATIVE_RELEASE_PRESET) $(NATIVE_CMAKE_FLAGS)
-	cd native && cmake --build build
+	PROJECT_NAME=native-lib cmake -G Ninja -S native -B native/build --preset $(NATIVE_RELEASE_PRESET) $(NATIVE_CMAKE_FLAGS)
+	cmake --build native/build
 
 build-native-debug:
-	cd native && PROJECT_NAME=native-lib cmake -G Ninja -S . -B build --preset $(NATIVE_DEBUG_PRESET) $(NATIVE_CMAKE_FLAGS)
-	cd native && cmake --build build
+	PROJECT_NAME=native-lib cmake -G Ninja -S native -B native/build --preset $(NATIVE_DEBUG_PRESET) $(NATIVE_CMAKE_FLAGS)
+	cmake --build native/build
 
 test-native:
-	cd native && ctest --test-dir build
+	ctest --test-dir native/build
 
 clean-native:
 	rm -rf native/build
@@ -79,39 +79,39 @@ clean-native:
 .PHONY: build-rust build-rust-debug test-rust clean-rust
 
 build-rust:
-	cd rust && cargo build --release
+	cargo build --manifest-path rust/Cargo.toml --release
 
 build-rust-debug:
-	cd rust && cargo build
+	cargo build --manifest-path rust/Cargo.toml
 
 test-rust:
-	cd rust && cargo test
+	cargo test --manifest-path rust/Cargo.toml
 
 clean-rust:
-	cd rust && cargo clean
+	cargo clean --manifest-path rust/Cargo.toml
 
 # ── Swift ──────────────────────────────────────────────────────────
 
 .PHONY: build-swift build-swift-debug test-swift clean-swift
 
 build-swift:
-	cd swift && LD_LIBRARY_PATH="$(SWIFT_LD_LIBRARY_PATH)$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}" swift build -c release
+	LD_LIBRARY_PATH="$(SWIFT_LD_LIBRARY_PATH)$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}" swift build --package-path swift -c release
 
 build-swift-debug:
-	cd swift && LD_LIBRARY_PATH="$(SWIFT_LD_LIBRARY_PATH)$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}" swift build
+	LD_LIBRARY_PATH="$(SWIFT_LD_LIBRARY_PATH)$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}" swift build --package-path swift
 
 test-swift:
-	cd swift && LD_LIBRARY_PATH="$(SWIFT_LD_LIBRARY_PATH)$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}" swift test
+	LD_LIBRARY_PATH="$(SWIFT_LD_LIBRARY_PATH)$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}" swift test --package-path swift
 
 clean-swift:
-	cd swift && swift package clean
+	swift package clean --package-path swift
 
 # ── TypeScript ─────────────────────────────────────────────────────
 
 .PHONY: build-typescript test-typescript clean-typescript
 
 build-typescript:
-	cd typescript && npm run build
+	npm run build --prefix typescript
 
 test-typescript:
 	cd typescript && npx jest
@@ -123,9 +123,9 @@ clean-typescript:
 
 wasm:
 	@if echo 'fn main(){}' | rustc --target wasm32-unknown-unknown - -o /dev/null 2>/dev/null; then \
-		cd rust && cargo build --target wasm32-unknown-unknown --release && \
-		wasm-bindgen --target web --out-dir target/npm-pkg \
-			target/wasm32-unknown-unknown/release/rust.wasm; \
+		cargo build --manifest-path rust/Cargo.toml --target wasm32-unknown-unknown --release && \
+		wasm-bindgen --target web --out-dir rust/target/npm-pkg \
+			rust/target/wasm32-unknown-unknown/release/rust.wasm; \
 	else \
 		echo "Skipping WASM build (wasm32-unknown-unknown target not available -- use nix develop)"; \
 		mkdir -p rust/target/npm-pkg; \
@@ -135,7 +135,7 @@ DIST       ?= dist
 TS_DIST    ?= typescript/dist
 NATIVE_LIB ?= native/build
 RUST_LIB   ?= rust/target/release
-SWIFT_LIB  ?= $$(cd swift && swift build -c release --show-bin-path)
+SWIFT_LIB  ?= $$(swift build --package-path swift -c release --show-bin-path)
 
 # ── Install ───────────────────────────────────────────────────────
 
@@ -167,4 +167,8 @@ test:
 clean: clean-native clean-rust clean-swift clean-typescript
 
 format:
+	npx --prefix typescript prettier . --write
+	cargo fmt --manifest-path rust/Cargo.toml
+	swift format format --recursive --in-place swift/Sources swift/Tests swift/Package.swift
+	find native \( -name '*.c' -o -name '*.h' -o -name '*.cpp' -o -name '*.hpp' -o -name '*.cc' -o -name '*.hh' -o -name '*.c++' -o -name '*.h++' -o -name '*.cxx' -o -name '*.hxx' -o -name '*.m' -o -name '*.mm' -o -name '*.cppm' \) -exec clang-format -i {} +
 	nix fmt

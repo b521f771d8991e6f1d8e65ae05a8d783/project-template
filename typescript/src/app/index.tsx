@@ -9,9 +9,9 @@ export default function RootNode() {
 	return (
 		<View className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
 			{/* Card container for even spacing */}
-			<View className="w-full max-w-md rounded-xl bg-white shadow-lg p-8 space-y-6">
+			<View className="w-full max-w-md space-y-6 rounded-xl bg-white p-8 shadow-lg">
 				{/* Title */}
-				<Text className="text-center text-2xl font-semibold underline text-gray-800">
+				<Text className="text-center text-2xl font-semibold text-gray-800 underline">
 					{t("home.welcome")}
 				</Text>
 

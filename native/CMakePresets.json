@@ -22,8 +22,9 @@
         {
             "name": "linux-base",
             "inherits": "default",
-            "environment": {
-                "COMMON_CFLAGS": "-fstack-protector-strong -fstack-clash-protection -Wformat=2 -Wall -pedantic -Werror -D_FORTIFY_SOURCE=3 -D_GLIBCXX_ASSERTIONS -Wl,-z,relro,-z,now -Wformat -Wformat=2 -Wconversion -Wimplicit-fallthrough -Werror=format-security -Wl,-z,nodlopen -Wl,-z,noexecstack -Wl,--as-needed -Wl,--no-copy-dt-needed-entries -Wno-unused-command-line-argument"
+            "cacheVariables": {
+                "CMAKE_EXE_LINKER_FLAGS": "-Wl,-z,relro,-z,now -Wl,-z,nodlopen -Wl,-z,noexecstack -Wl,--as-needed -Wl,--no-copy-dt-needed-entries",
+                "CMAKE_SHARED_LINKER_FLAGS": "-Wl,-z,relro,-z,now -Wl,-z,nodlopen -Wl,-z,noexecstack -Wl,--as-needed -Wl,--no-copy-dt-needed-entries"
             }
         },
         {
